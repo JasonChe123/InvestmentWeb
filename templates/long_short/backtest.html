@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- Input params -->
+<div class="row">
+    <div class="col-md-12">
+
+        <!-- Header -->
+        <div class="row">
+            <!-- Header -->
+            <div class="col-md-3 d-flex align-items-center">
+                <h4 class="my-3">Backtest Parameters</h4>
+            </div>
+
+            <!-- Collapse button -->
+            <div class="col-md-3 d-flex align-items-center">
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="collapse"
+                        data-bs-target="#backtest_params_area" id="collapse_params_button">
+                    {% if collapse %}Show{% else %}Hide{% endif %}
+                </button>
+            </div>
+        </div>
+
+        <!-- Backtest parameters - collapsable area -->
+        <div id="backtest_params_area" class="collapse show">
+            <form action="{% url 'longshort-backtest' %}" method="post">
+                {% csrf_token %}
+                <div class="row">
+                    <!-- Market Cap -->
+                    <div class="col-md-3 form-group">
+                        <label>Market Cap</label>
+                        <div class="card">
+                            <div class="card-body">
+                                {% for mc in market_cap %}
+                                <input class="form-check-input" type="checkbox" id={{ mc }} name="market_cap"
+                                       {% if mc in selected_market_cap %}checked{% endif %} value="{{ mc }}">
+                                <label class="form-check-label" for={{ mc }}>{{ mc }}</label>
+                                <br>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Other params -->
+                    <div class="col-md-8">
+                        <div class="row">
+                            <!-- Ipo years -->
+                            <div class="form-group col-md-4 mb-3">
+                                <label for="ipo_years">Min IPO Years</label>
+                                <select id="ipo_years" name='ipo_years' class="form-control">
+                                    {% for y in ipo_years %}
+                                    {% if y == selected_ipo_years %}
+                                    <option selected>{{ y }}</option>
+                                    {% else %}
+                                    <option>{{ y }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <!-- Method -->
+                            <div class="form-group col-md-4 mb-3">
+                                <label for="method">Method</label>
+                                <select id="method" name='method' class="form-control">
+                                    {% for m in methods %}
+                                    {% if m == selected_method %}
+                                    <option selected>{{ m }}</option>
+                                    {% else %}
+                                    <option>{{ m }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <!-- Sectors -->
+                            <div class="form-group col-md-4 mb-3">
+                                <label for="sectors">Sector</label>
+                                <select id="sectors" name="sectors" class="form-control">
+                                    {% for s in sectors %}
+                                    {% if s == selected_sectors %}
+                                    <option selected>{{ s }}</option>
+                                    {% else %}
+                                    <option>{{ s }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <!-- Backtest years -->
+                            <div class="form-group col-md-4 mb-3">
+                                <label for="backtest_years">Backtest Years</label>
+                                <select id="backtest_years" name="backtest_years" class="form-control">
+                                    {% for y in backtest_years %}
+                                    {% if y == selected_backtest_years %}
+                                    <option selected>{{ y }}</option>
+                                    {% else %}
+                                    <option>{{ y }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <!-- Positions hold -->
+                            <div class="form-group col-md-4 mb-3">
+                                <label for="pos_hold">Position</label>
+                                <select id="pos_hold" name="pos_hold" class="form-control">
+                                    {% for p in pos_hold %}
+                                    {% if p == selected_pos_hold %}
+                                    <option selected>{{ p }}</option>
+                                    {% else %}
+                                    <option>{{ p }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Submit button -->
+                <div class="col-md-1 mt-3">
+                    <button type="submit" class="btn btn-primary col-md-12">Start</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<hr>
+<!-- Backtest result -->
+<div class="row">
+    <div class="col-md-12">
+        {% include 'partials/_messages.html' %}
+        <h4 class="my-3">
+            Backtest Result for Top {{ selected_pos_hold }} and
+            Bottom {{ selected_pos_hold }} ranked by {{ selected_method }}
+        </h4>
+        <!-- Top Stocks -->
+        <div class="row">
+            <p>
+                Top {{ selected_pos_hold }} Stocks (Total Performance
+                <b {% if long_total < 0 %} style="color: red" {% endif %}> {{ long_total }}%</b>
+                )
+            </p>
+            <table class="table table-sm table-striped">
+                <!-- Header -->
+                <tr>
+                    {% for col in df_top.columns %}
+                    <th class="text-center">{{ col }}</th>
+                    {% endfor %}
+                </tr>
+
+                <!-- Data -->
+                {% for i, row in df_top.iterrows %}
+                <tr>
+                    {% for cell in row %}
+                    <td>{{ cell }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <!-- Bottom Stocks -->
+        <div class="row">
+            <p>
+                Bottom {{ selected_pos_hold }} Stocks (Total Performance
+                <b {% if short_total < 0 %} style="color: red" {% endif %}>{{ short_total }}%</b>
+                )
+            </p>
+            <table class="table table-sm table-striped">
+                <!-- Header -->
+                <tr>
+                    {% for col in df_bottom.columns %}
+                    <th class="text-center">{{ col }}</th>
+                    {% endfor %}
+                </tr>
+
+                <!-- Data -->
+                {% for i, row in df_bottom.iterrows %}
+                <tr>
+                    {% for cell in row %}
+                    <td>{{ cell }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Script -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Add new-line before and after 'to' in all table headers
+        const heads = document.getElementsByTagName('th');
+        for (let i = 0; i < heads.length; i++) {
+            heads[i].innerHTML = heads[i].innerHTML.replaceAll(" to ", "<br>to<br>");
+        }
+
+        // Change color to 'red' for negative values, and align all numbers to the right
+        const cells = document.getElementsByTagName('td');
+        for (let i = 0; i < cells.length; i++) {
+            const value = parseFloat(cells[i].textContent);
+
+            // Align all numbers to the right
+            if (typeof (value) === 'number' && !isNaN(value)) {
+                cells[i].style.textAlign = 'right';
+            }
+
+            // Change color of negative values
+            if (!isNaN(value) && value < 0) {
+                cells[i].style.color = 'red';
+            }
+        }
+
+        // Add border to all tables
+        const tables = document.getElementsByTagName('table');
+        for (let i = 0; i < tables.length; i++) {
+            tables[i].style.border = '1px solid #bbb';
+        }
+
+        // Add left border to all symbol columns
+        for (let i = 0; i < heads.length; i++) {  // i starts from 1 because i need to ignore the first comlumn
+            if (heads[i].textContent === 'Symbol') {
+                const symbolColumnIndex = heads[i].cellIndex;
+                heads[i].style.borderLeft = '1px solid #bbb';
+
+                for (let j = 0; j < cells.length; j++) {
+                    if (cells[j].cellIndex === symbolColumnIndex) {
+                        cells[j].style.borderLeft = '1px solid #bbb';
+                    }
+                }
+            }
+        }
+
+        // Toggle show/ hide text in collapse button
+        var collapse_params_button = document.getElementById('collapse_params_button');
+        var backtest_params_area = document.getElementById('backtest_params_area');
+        backtest_params_area.addEventListener('show.bs.collapse', function () {
+            collapse_params_button.innerText = "Hide";
+        });
+        backtest_params_area.addEventListener('hidden.bs.collapse', function () {
+            collapse_params_button.innerText = "Show";
+        });
+    });
+</script>
+{% endblock content %}

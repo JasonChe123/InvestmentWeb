@@ -2,9 +2,8 @@ import datetime as dt
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import models
-import json
 import logging
-from long_short_strategy.models import Stock, FinancialReport, BalanceSheet, CashFlow, IncomeStatement
+from long_short_strategy.models import Stock, FinancialReport, BalanceSheet, CashFlow, IncomeStatement, CandleStick
 import numpy as np
 import os
 import pandas as pd
@@ -17,113 +16,116 @@ class Command(BaseCommand):
     help = 'Initialize the database for long_short_strategy'
 
     def handle(self, *args, **options):
-        # Decision of deleting all stocks
+        df_stock_list = get_stock_list()
+        self.querying_delete_all_stock()
+        self.querying_update_all_stock(df_stock_list)
+        self.querying_update_all_candlestick(df_stock_list)
+        self.querying_update_financial_report(df_stock_list)
+
+    def querying_delete_all_stock(self):
         self.stdout.write(self.style.WARNING("'DELETE' ALL DATA? It would be irreversible."))
         while (ans := input('(y/n) ').strip().lower()) not in ('y', 'n'):
             print("Please enter 'y' or 'n")
-        if ans == 'y':
-            delete_data_from_db_table(Stock, FinancialReport)
+        if ans.strip().lower() == 'y':
+            delete_data_from_db_table(Stock)
             self.stdout.write(self.style.SUCCESS("Stock data 'DELETE' success!"))
 
-        # Decision of updating all stocks
+    def querying_update_all_stock(self, df_stock_list: pd.DataFrame):
         self.stdout.write(self.style.WARNING("'UPDATE' STOCK DATA?"))
-        df_stock_list = get_stock_list()
         while (ans := input('(y/n) ').strip().lower()) not in ('y', 'n'):
             print("Please enter 'y' or 'n")
-        if ans == 'y':
+        if ans.strip().lower() == 'y':
             update_stock_list_db(df_stock_list)
             self.stdout.write(self.style.SUCCESS("Stock data 'UPDATE' success!"))
 
-        # Decision of updating all financial reports
+    def querying_update_all_candlestick(self, df_stock_list: pd.DataFrame):
+        self.stdout.write(self.style.WARNING("'UPDATE' CANDLESTICK DATA?"))
+        print("It will delete all candlestick data and download it again.")
+        while (ans := input('(y/n) ').strip().lower()) not in ('y', 'n'):
+            print("Please enter 'y' or 'n")
+        if ans.strip().lower() == 'y':
+            update_candlestick_db(df_stock_list)
+            self.stdout.write(self.style.SUCCESS("Candlestick data 'UPDATE' success!"))
+
+    def querying_update_financial_report(self, df_stock_list: pd.DataFrame):
         self.stdout.write(self.style.WARNING("'UPDATE' FINANCIAL REPORT?"))
         while (ans := input('(y/n) ').strip().lower()) not in ('y', 'n'):
             print("Please enter 'y' or 'n")
-        if ans == 'n':
+        if ans.strip().lower() == 'n':
             self.stdout.write(self.style.NOTICE('Financial report data "UPDATE" canceled!'))
             return
 
         # Get all stock objects and store them in a dictionary
-        stocks = {stock.symbol: stock for stock in Stock.objects.all()}
-
-        # Initialize pending lists to be bulk updated
-        l_financial_reports = []
-        l_balance_sheets = []
-        l_cash_flows = []
-        l_income_statements = []
+        stocks = {stock.ticker: stock for stock in Stock.objects.all()}
 
         # Loop over the stock list
-        for index, row in tqdm(df_stock_list.iterrows(), desc="Initializing financial report database..."):
-            # Fetch data from yfinance
-            financials, balance_sheet, cash_flow, income_statement = get_financial_data(row['Symbol'])
-
+        for index, row in tqdm(df_stock_list.iterrows(), desc="Updating financial report database..."):
             # Get symbol from Stock table
-            stock = stocks.get(row['Symbol'])
+            symbol = row['Symbol']
+            stock = stocks.get(symbol)
+            if not stock:
+                continue
 
-            # If the stock doesn't exist, you cannot create its financial report
-            if stock:
-                db_financial = get_or_create_from_db(stock, financials, FinancialReport)
-                db_balance_sheet = get_or_create_from_db(stock, balance_sheet, BalanceSheet)
-                db_cash_flow = get_or_create_from_db(stock, cash_flow, CashFlow)
-                db_income_statement = get_or_create_from_db(stock, income_statement, IncomeStatement)
+            financials = yf.Ticker(symbol).quarterly_financials
+            update_reports(financials, stock, FinancialReport)
 
-                # Add to pending list
-                l_financial_reports.append(db_financial)
-                l_balance_sheets.append(db_balance_sheet)
-                l_cash_flows.append(db_cash_flow)
-                l_income_statements.append(db_income_statement)
+            balance_sheet = yf.Ticker(symbol).quarterly_balance_sheet
+            update_reports(balance_sheet, stock, BalanceSheet)
 
-        # Prepare fields to update
-        fields_to_update_fn = [field.name for field in FinancialReport._meta.get_fields() if
-                               field.concrete and field.name != 'id' and field.name != 'symbol_id']
-        fields_to_update_bs = [field.name for field in BalanceSheet._meta.get_fields() if
-                               field.concrete and field.name != 'id' and field.name != 'symbol_id']
-        fields_to_update_cf = [field.name for field in CashFlow._meta.get_fields() if
-                               field.concrete and field.name != 'id' and field.name != 'symbol_id']
-        fields_to_update_is = [field.name for field in IncomeStatement._meta.get_fields() if
-                               field.concrete and field.name != 'id' and field.name != 'symbol_id']
+            cash_flow = yf.Ticker(symbol).quarterly_cash_flow
+            update_reports(cash_flow, stock, CashFlow)
 
-        # Bulk update
-        FinancialReport.objects.bulk_update(l_financial_reports, fields=fields_to_update_fn, batch_size=100)
-        BalanceSheet.objects.bulk_update(l_balance_sheets, fields=fields_to_update_bs, batch_size=100)
-        CashFlow.objects.bulk_update(l_cash_flows, fields=fields_to_update_cf, batch_size=100)
-        IncomeStatement.objects.bulk_update(l_income_statements, fields=fields_to_update_is, batch_size=100)
+            income_statement = yf.Ticker(symbol).quarterly_income_stmt
+            update_reports(income_statement, stock, IncomeStatement)
 
-        # Success
+        # Success message
         self.stdout.write(self.style.SUCCESS("Financial data 'UPDATE' success!"))
 
 
-def delete_data_from_db_table(*args) -> bool:
-    """
-    Delete data from database
-    :param args: Table object(models.Model)
-    :return: Success of fail (True/ False)
-    """
-    res = input(
-        "You are going to delete the stock data, it will delete its related data, like any price data and non price data, and it is irreversible.\nAre you sure to delete all records? (y/n) ")
-    if res.strip().lower() == 'n':
-        return False
+def get_stock_list() -> pd.DataFrame:
+    # Get stock list, source: https://www.nasdaq.com/market-activity/stocks/screener
+    csv_file = os.path.join(settings.BASE_DIR, 'static', 'stock_list', 'nasdaq_screener.csv')
+
+    # Filter out all stocks with '^' in symbol
+    df = pd.read_csv(csv_file)
+    df = df[~df['Symbol'].str.contains(r'^')].reset_index(drop=True)
+
+    return df
+
+
+def delete_data_from_db_table(table: Type[Stock]):
+    print("You are going to delete the stock data, it will delete its related data, "
+          "like any price data and non price data, and it is irreversible."
+          "\nAre you sure to delete all records? (y/n) ")
+    while (ans := input('(y/n) ').strip().lower()) not in ('y', 'n'):
+        print("Please enter 'y' or 'n")
+    if ans.strip().lower() == 'n':
+        return
 
     logging.warning("Deleting all records...")
-    [table.objects.all().delete() for table in args]
-
-    return True
+    table.objects.all().delete()
+    print("All stock data was deleted.")
 
 
 def update_stock_list_db(stock_list: pd.DataFrame):
+    # Prepare list to bulk update
     l_stocks = []
 
     # Loop over the stock list
     for index, row in tqdm(stock_list.iterrows(), desc="Updating stock table from database..."):
-        # Create or update Stock
+        # Initialize missing data
         ipo_year = 0 if np.isnan(row['IPO Year']) else row['IPO Year']
         market_cap = 0 if np.isnan(row['Market Cap']) else row['Market Cap']
+        sector = 'Miscellaneous' if isinstance(row['Sector'], float) else row['Sector'].strip()
+        industry = 'Miscellaneous' if isinstance(row['Industry'], float) else row['Industry'].strip()
 
-        stock, created = Stock.objects.get_or_create(symbol=row['Symbol'])
-        stock.name = row['Name']
-        stock.country = row['Country']
+        # Create or update Stock
+        stock, created = Stock.objects.get_or_create(ticker=row['Symbol'].strip())
+        stock.name = row['Name'].strip()
+        stock.country = row['Country'].strip()
         stock.ipo_year = ipo_year
-        stock.sector = row['Sector']
-        stock.industry = row['Industry']
+        stock.sector = sector
+        stock.industry = industry
         stock.market_cap = market_cap
 
         # Add Stock instance to a list, pending to be bulk updated
@@ -132,37 +134,58 @@ def update_stock_list_db(stock_list: pd.DataFrame):
     # Bulk update
     fields = [field.name for field in Stock._meta.get_fields() if field.concrete and field.name != 'id']
     Stock.objects.bulk_update(l_stocks, fields=fields, batch_size=100)
+    print("All stock basic data was updated.")
 
 
-def get_stock_list() -> pd.DataFrame:
-    # Get stock list, download from https://www.nasdaq.com/market-activity/stocks/screener
-    csv_file = os.path.join(settings.BASE_DIR, 'static', 'stock_list', 'nasdaq_screener.csv')
-    return pd.read_csv(csv_file)
+def update_candlestick_db(stock_list: pd.DataFrame):
+    # Delete all existing data
+    CandleStick.objects.all().delete()
+
+    # Prepare list to bulk update
+    l_candlesticks = []
+
+    # Default downloading 3 years candlestick data
+    start_date = dt.date.today() - dt.timedelta(days=365 * 3)
+    stocks = {stock.ticker: stock for stock in Stock.objects.all()}
+
+    # Download data for all stocks at once
+    candlestick_data = {ticker: yf.download(ticker, start=start_date) for ticker in
+                        stock_list['Symbol'].unique().tolist()}
+
+    # Create candlestick objects in bulk
+    for ticker, stock_data in tqdm(candlestick_data.items(), desc="Updating candlestick table from database..."):
+        # Drop multiple columns 'Ticker'
+        stock_data.columns = stock_data.columns.droplevel('Ticker')
+
+        stock = stocks.get(ticker)
+        if stock:
+            for index, row in stock_data.iterrows():
+                data = row.to_dict()
+                # To turn 'Adj Close' to 'adj_close' for all keys (to match for column format of CandleStick model)
+                data = {key.replace(' ', '_').lower(): value for key, value in data.items()}
+                candlestick = CandleStick(stock=stock, date=row.name, **data, )
+
+                # Add to pending list
+                l_candlesticks.append(candlestick)
+
+    # Bulk create candlestick objects
+    CandleStick.objects.bulk_create(l_candlesticks, batch_size=100, ignore_conflicts=True)
+    print("All candlestick data was updated.")
 
 
-def get_financial_data(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    ticker = yf.Ticker(symbol)
-    financials = ticker.quarterly_financials
-    balance_sheet = ticker.quarterly_balance_sheet
-    cash_flow = ticker.quarterly_cash_flow
-    income_statement = ticker.quarterly_income_stmt
+def update_reports(report: pd.DataFrame,
+                   stock: Stock,
+                   model: Type[FinancialReport | BalanceSheet | CashFlow | IncomeStatement]):
+    # Prepare list to bulk update
+    report_list = []
 
-    return financials, balance_sheet, cash_flow, income_statement
+    for date, report_data in report.to_dict().items():
+        # To turn 'Total Revenue' to 'TotalRevenue' for all keys (to match for column format of relevant model)
+        data = {key.replace(' ', ''): value for key, value in report_data.items()}
 
+        report, created = model.objects.get_or_create(stock=stock, date=date)
+        [setattr(report, key, 0 if np.isnan(value) else value) for key, value in data.items()]
+        report_list.append(report)
 
-def get_or_create_from_db(stock: models.Model,
-                          data: pd.DataFrame,
-                          model: Type[FinancialReport | BalanceSheet | CashFlow | IncomeStatement]
-                          ) -> models.Model:
-    # Create dict: {report_date: report_data, ...}
-    report_dates = {}
-    for report_date in data.columns:
-        report_date_str = dt.datetime.strftime(report_date, '%b%y')
-        report_dates[report_date_str] = json.loads(data[report_date].to_json())
-
-    # Create or update data
-    report, created = model.objects.get_or_create(symbol=stock)
-    for date, report_data in report_dates.items():
-        setattr(report, date, report_data)
-
-    return report
+    fields_to_update = [field.name for field in model._meta.get_fields() if field.name != 'id']
+    model.objects.bulk_update(report_list, fields=fields_to_update, batch_size=100)

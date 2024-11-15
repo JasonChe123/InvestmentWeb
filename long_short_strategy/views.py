@@ -9,10 +9,11 @@ import logging
 from multiprocessing import cpu_count
 import numpy as np
 import pandas as pd
+import pytz
 import re
 from typing import Tuple
 import yfinance as yf
-from .models import Stock, FinancialReport, BalanceSheet, CashFlow, IncomeStatement
+from .models import Stock, FinancialReport, BalanceSheet, CashFlow, IncomeStatement, CandleStick
 
 market_cap_str = ['Mega (>$200B)',
                   'Large ($10B-$200B)',
@@ -36,38 +37,61 @@ class DashboardView(View):
 
 
 class BackTestView(View):
-    ipo_years = [5, 4, 3, 2, 1]
-    market_cap = dict()
-    for s, v in zip(market_cap_str, market_cap_value):
-        market_cap[s] = v
-    methods = [
-        'EPS',
-        'EBIT/Assets',
-        'Operating Cash Flow (M)',
-        'Investing Cash Flow (M)',
-        'Financing Cash Flow (M)',
-        'Free Cash Flow (M)',
-        'Assets/Liabilities',
-        'Repurchase of Capital Stock (M)',
-    ]
-    sectors = ['Basic Materials', 'Technology', 'Industrials', 'Health Care', 'Energy', 'Consumer Discretionary',
-               'Real Estate', 'Miscellaneous', 'Telecommunications', 'Consumer Staples', 'Utilities', 'Finance']
-    sectors.sort()
-    backtest_years = [1.5, 1]
-    pos_hold = [50, 40, 30, 20, 10]
-    re_balancing_months = [
-        'Jan, Apr, Jul, Oct',
-        'Feb, May, Aug, Nov',
-        'Mar, Jun, Sep, Dec',
-    ]
-    html_context = {'market_cap': market_cap.keys(),
-                    'ipo_years': ipo_years,
-                    'methods': methods,
-                    'sectors': sectors,
-                    'backtest_years': backtest_years,
-                    'pos_hold': pos_hold,
-                    }
-    candle_stick_data = {}
+    # ipo_years = [5, 4, 3, 2, 1]
+    # market_cap = dict()
+    # for s, v in zip(market_cap_str, market_cap_value):
+    #     market_cap[s] = v
+    # methods = [
+    #     'Basic EPS',
+    # ]
+    # sectors = ['Basic Materials', 'Technology', 'Industrials', 'Health Care', 'Energy', 'Consumer Discretionary',
+    #            'Real Estate', 'Miscellaneous', 'Telecommunications', 'Consumer Staples', 'Utilities', 'Finance']
+    # sectors.sort()
+    # backtest_years = [1.5, 1]
+    # pos_hold = [50, 40, 30, 20, 10]
+    # re_balancing_months = [
+    #     'Jan, Apr, Jul, Oct',
+    #     'Feb, May, Aug, Nov',
+    #     'Mar, Jun, Sep, Dec',
+    # ]
+    # html_context = {'market_cap': market_cap.keys(),
+    #                 'ipo_years': ipo_years,
+    #                 'methods': methods,
+    #                 'sectors': sectors,
+    #                 'backtest_years': backtest_years,
+    #                 'pos_hold': pos_hold,
+    #                 }
+    # candle_stick_data = {}
+
+    def __init__(self):
+        super().__init__()
+        self.ipo_years = [5, 4, 3, 2, 1]
+        self.market_cap = dict()
+        for s, v in zip(market_cap_str, market_cap_value):
+            self.market_cap[s] = v
+        self.methods = [
+            'Basic EPS',
+        ]
+        self.sectors = ['Basic Materials', 'Technology', 'Industrials', 'Health Care', 'Energy',
+                        'Consumer Discretionary',
+                        'Real Estate', 'Miscellaneous', 'Telecommunications', 'Consumer Staples', 'Utilities',
+                        'Finance']
+        self.sectors.sort()
+        self.backtest_years = [1.5, 1]
+        self.pos_hold = [50, 40, 30, 20, 10]
+        self.re_balancing_months = [
+            'Jan, Apr, Jul, Oct',
+            'Feb, May, Aug, Nov',
+            'Mar, Jun, Sep, Dec',
+        ]
+        self.html_context = {'market_cap': self.market_cap.keys(),
+                             'ipo_years': self.ipo_years,
+                             'methods': self.methods,
+                             'sectors': self.sectors,
+                             'backtest_years': self.backtest_years,
+                             'pos_hold': self.pos_hold,
+                             }
+        self.candle_stick_data = {}
 
     def get(self, request):
         self.html_context['selected_market_cap'] = list(self.market_cap.keys())[:3]
@@ -80,13 +104,15 @@ class BackTestView(View):
         return render(request, 'long_short/backtest.html', self.html_context)
 
     def post(self, request):
-        # Get parameters
+        # Get user's parameters
         market_cap = request.POST.getlist('market_cap')
         ipo_years = int(request.POST.get('ipo_years'))
         method = request.POST.get('method')
         sector = request.POST.get('sectors')
         backtest_years = float(request.POST.get('backtest_years'))
         pos_hold = int(request.POST.get('pos_hold'))
+
+        # Add to context
         self.html_context['selected_market_cap'] = market_cap
         self.html_context['selected_ipo_years'] = ipo_years
         self.html_context['selected_method'] = method
@@ -94,10 +120,13 @@ class BackTestView(View):
         self.html_context['selected_backtest_years'] = backtest_years
         self.html_context['selected_pos_hold'] = pos_hold
 
-        # Get US stocks
+        # Check input validity
+        if not market_cap:
+            messages.warning(request, 'No stocks found, please adjust your filter.')
+            return render(request, 'long_short/backtest.html', self.html_context)
+
+        # Get US stocks dataframe
         us_stocks = get_us_stocks(market_cap, ipo_years, [sector, ])
-        us_stocks = us_stocks.rename(
-            columns={'symbol': 'Symbol'})  # change to upper to match the data source (yfinance)
         if len(us_stocks) == 0:
             messages.warning(request, 'No stocks found, please adjust your filter.')
             return render(request, 'long_short/backtest.html', self.html_context)
@@ -105,8 +134,110 @@ class BackTestView(View):
         # Get re-balancing dates
         re_balancing_dates = get_re_balancing_dates(self.re_balancing_months[1], backtest_years)
 
+        # Get result by method chose
+        merged_results = us_stocks.copy()
+        for date in re_balancing_dates:
+            # Add result columns to us_stocks dataframe
+            result = fetch_data_by_method(date, us_stocks.copy(), method)
+            result = result[['Ticker', result.columns[-1]]]
+            merged_results = pd.merge(merged_results, result, on='Ticker', how='left')
+
+        # Ranking and split dataframe by result columns
+        result_subset = {}
+        result_cols = [col for col in merged_results.columns if col.startswith(f'{method}-')]
+        for col in result_cols:
+            result_subset[col] = merged_results[['Ticker', col]].sort_values(by=col, ascending=False)
+            result_subset[col].dropna(inplace=True, subset=[col])
+
+        # Get performance for every re-balancing date
+        from_months = list(result_subset.keys())
+        to_months = list(result_subset.keys())[1:] + [
+            f'{method}-{dt.date.strftime(dt.date.today(), "%b %y")}'
+        ]
+        for from_month, to_month in zip(from_months, to_months):
+            # Initialize performance column
+            df = result_subset[from_month]
+            df['Performance'] = np.nan
+
+            # Formatting for start_date and end_date: {method}-May 23 -> 2023-05-01
+            start_date = extract_date_suffix(from_month).replace(tzinfo=dt.timezone.utc)
+            end_date = extract_date_suffix(to_month).replace(tzinfo=dt.timezone.utc)
+            if start_date == end_date:
+                end_date = dt.datetime.today().replace(tzinfo=dt.timezone.utc)
+
+            # Extract top and bottom stocks
+            half_rows_num = min(pos_hold, len(df) // 2)
+            df = pd.concat([df.head(half_rows_num), df.tail(half_rows_num)])
+
+            # Get performance changed for symbols
+            for i, row in df.iterrows():
+                stock = Stock.objects.get(ticker=row['Ticker'])
+                candlesticks = CandleStick.objects.filter(stock=stock, date__gte=start_date, date__lt=end_date)
+
+                # Check if candlestick data exists
+                if not candlesticks:
+                    continue
+
+                # Check if candlestick data is too far away from re-balancing date
+                candlestick_start_date = candlesticks.first().date
+                candlestick_end_date = candlesticks.last().date
+                if candlestick_start_date > candlestick_start_date + dt.timedelta(days=30) or \
+                        candlestick_end_date < end_date - dt.timedelta(days=30):
+                    logging.warning(f"Candlestick data is too far away: {row['Ticker']}")
+                    continue
+
+                # Calculate performance
+                from_price = float(candlesticks.first().open)
+                to_price = float(candlesticks.last().close)
+                df.at[i, 'Performance'] = round((to_price / from_price - 1) * 100, 2)
+
+            # Rename column and add result to subset
+            period_str = f'{from_month.replace(method + "-", "")} to {to_month.replace(method + "-", "")}'
+            df.rename(columns={from_month: period_str, }, inplace=True)
+            result_subset[from_month] = df
+
+        # Combine results
+        df_top = pd.DataFrame()
+        df_bottom = pd.DataFrame()
+        for key, df in result_subset.items():
+            df.dropna(inplace=True)
+            half_rows_num = min(pos_hold, len(df) // 2)
+
+            # Add top stocks
+            new_top = df.head(half_rows_num)
+            new_top.reset_index(inplace=True, drop=True)
+            df_top.reset_index(inplace=True, drop=True)
+            df_top = pd.concat([df_top, new_top], axis=1)
+
+            # Add bottom stocks
+            new_bottom = df.tail(half_rows_num)
+            new_bottom.reset_index(inplace=True, drop=True)
+            df_bottom.reset_index(inplace=True, drop=True)
+            df_bottom = pd.concat([df_bottom, new_bottom], axis=1)
+        if df_top.empty and df_bottom.empty:
+            messages.warning(request, 'No financial data available, please adjust your filter.')
+
+        # It will add mean performance: set it individually because it has same column name 'Performance' for multiple columns
+        long_total_performance = round(add_mean_row(df_top), 2)
+        short_total_performance = round(add_mean_row(df_bottom), 2)
+
+        # Set html context
+        df_top.rename(columns={'Performance': 'Perf(%)'}, inplace=True)
+        df_bottom.rename(columns={'Performance': 'Perf(%)'}, inplace=True)
+        df_top.replace(np.nan, "", inplace=True)
+        df_bottom.replace(np.nan, "", inplace=True)
+
+        self.html_context['df_top'] = df_top
+        self.html_context['df_bottom'] = df_bottom
+        self.html_context['long_total'] = long_total_performance
+        self.html_context['short_total'] = short_total_performance
+
+        return render(request, 'long_short/backtest.html', self.html_context)
+
+
         # Set up multiprocessing for fetching data
         num_cpus = min(cpu_count(), len(re_balancing_dates))
+
         with ProcessPoolExecutor(max_workers=num_cpus) as outer_executor:
             futures = [
                 outer_executor.submit(fetch_data_by_method, date, us_stocks.copy(), method)
@@ -120,13 +251,14 @@ class BackTestView(View):
 
         # Combined_results
         merged_results = us_stocks.copy()
+
         for result in results:
-            result = result[['Symbol', result.columns[-1]]]
+            result = result[['Ticker', result.columns[-1]]]
             merged_results = pd.merge(merged_results,
                                       result[
-                                          ['Symbol', result.columns[-1]]
+                                          ['Ticker', result.columns[-1]]
                                       ],
-                                      on='Symbol',
+                                      on='Ticker',
                                       how='left')
 
         # Re-order dataframe columns by re-balancing date
@@ -136,7 +268,7 @@ class BackTestView(View):
         result_subset = {}
         result_cols = [col for col in merged_results.columns if col.startswith(f'{method}-')]
         for col in result_cols:
-            result_subset[col] = merged_results[['Symbol', col]].sort_values(by=col, ascending=False)
+            result_subset[col] = merged_results[['Ticker', col]].sort_values(by=col, ascending=False)
             result_subset[col].dropna(inplace=True, subset=[col])
 
         # Get performance for every re-balancing date
@@ -167,14 +299,14 @@ class BackTestView(View):
 
             # Get performance changed for symbols
             for i, row in df.iterrows():
-                if not isinstance(self.candle_stick_data.get(row['Symbol']), pd.DataFrame):
+                if not isinstance(self.candle_stick_data.get(row['Ticker']), pd.DataFrame):
                     download_start_date = dt.date.today() - dt.timedelta(days=365 * max(self.backtest_years) + 30)
-                    data = yf.download(row['Symbol'], download_start_date)
+                    data = yf.download(row['Ticker'], download_start_date)
                     data.loc[pd.to_datetime(dt.datetime.today(), utc=True)] = np.nan
                     data = data.resample('D').last().ffill()
-                    self.candle_stick_data[row['Symbol']] = data
+                    self.candle_stick_data[row['Ticker']] = data
 
-                df.at[i, 'Performance'] = fetch_percent_changed(self.candle_stick_data.get(row['Symbol']), start_date,
+                df.at[i, 'Performance'] = fetch_percent_changed(self.candle_stick_data.get(row['Ticker']), start_date,
                                                                 end_date)
 
             result_subset[from_month] = df
@@ -250,7 +382,11 @@ def get_us_stocks(market_cap: list, min_ipo_years: int, sectors: list) -> pd.Dat
         sector__in=sectors
     )
 
-    return pd.DataFrame(results.values())
+    # Convert to dataframe
+    results = pd.DataFrame(results.values())
+    results.rename(columns={'ticker': 'Ticker'}, inplace=True)
+
+    return results
 
 
 def get_re_balancing_dates(re_balancing_months: str, backtest_years: float = 1) -> list:
@@ -261,7 +397,7 @@ def get_re_balancing_dates(re_balancing_months: str, backtest_years: float = 1) 
     for i, d in enumerate(re_balancing_months):
         re_balancing_months[i] = dt.datetime.strptime(d.strip(), '%b').month
 
-    # Get first re-balancing date: (now minus backtest_year)
+    # Get first re-balancing date: (today minus backtest_year)
     backtest_from = dt.datetime.now() - dt.timedelta(days=365 * backtest_years)
 
     # Define backtest_from
@@ -294,20 +430,27 @@ def get_re_balancing_dates(re_balancing_months: str, backtest_years: float = 1) 
 
 
 def fetch_earning_per_share(symbol: str, request_date: dt.date) -> float | None:
-    stock = Stock.objects.get(symbol=symbol)
-    reports = FinancialReport.objects.get(symbol=stock)
-    report = getattr(reports, dt.datetime.strftime(request_date, '%b%y'))
-    if report:
-        eps = report.get('Basic EPS', 0)
-        return round(eps, 2) if eps else 0
-    else:
-        return 0
+    stock = Stock.objects.get(ticker=symbol)
+    if not stock:
+        return 0.0
+
+    try:
+        report = FinancialReport.objects.get(stock=stock, date=request_date)
+    except Exception as e:
+        return 0.0
+
+    return report.BasicEPS if report.BasicEPS else 0.0
 
 
 def fetch_ebit_over_assets(symbol: str, request_date: dt.date) -> float | None:
-    stock = Stock.objects.get(symbol=symbol)
-    financials = FinancialReport.objects.get(symbol=stock)
-    balance_sheets = BalanceSheet.objects.get(symbol=stock)
+    stock = Stock.objects.get(ticker=symbol)
+    financials = FinancialReport.objects.get(stock=stock, date=request_date)
+    balance_sheets = BalanceSheet.objects.get(stock=stock, date=request_date)
+    ebit = financials.EBIT
+    total_assets = balance_sheets.TotalAssets
+
+    return round(ebit / total_assets, 2) if ebit and total_assets else 0
+
     financial = getattr(financials, dt.datetime.strftime(request_date, '%b%y'))
     balance_sheet = getattr(balance_sheets, dt.datetime.strftime(request_date, '%b%y'))
     if financial and balance_sheet:
@@ -399,7 +542,7 @@ def fetch_data_by_method(date: dt.date, us_stocks: pd.DataFrame, method: str) ->
     col_name = f'{method}-{dt.datetime.strftime(date, "%b %y")}'
     us_stocks[col_name] = np.nan
 
-    # Get report date. E.g. if date is 2021-04-01, then the report date is 2021-02-28
+    # Get report date. E.g. if date is 2021-02-01, then the report date is 2020-12-31
     if date.month - 2 < 1:
         request_report_date = date.replace(year=date.year - 1, month=12 + (date.month - 2))
     else:
@@ -408,6 +551,36 @@ def fetch_data_by_method(date: dt.date, us_stocks: pd.DataFrame, method: str) ->
     # Set last day of month
     last_day = calendar.monthrange(request_report_date.year, request_report_date.month)[1]
     request_report_date = request_report_date.replace(day=last_day)
+
+    for ticker in us_stocks['Ticker']:
+        # Get stock
+        stock = Stock.objects.get(ticker=ticker)
+        if not stock:
+            continue
+
+        # Get reoprt
+        report = FinancialReport.objects.filter(stock=stock, date=request_report_date)
+        if not report:
+            continue
+        if len(report) > 1:
+            logging.warning(f"Multiple reports for {ticker} on {request_report_date}! Please check.")
+            continue
+        report = report[0]
+
+        # Get data by method
+        if not getattr(report, method.replace(' ', '')):
+            continue
+
+        # Update value
+        us_stocks.loc[us_stocks['Ticker'] == ticker, col_name] = float(getattr(report, method.replace(' ', '')))
+
+    # Filter out zero and NaN
+    us_stocks = us_stocks[
+        (us_stocks[col_name] != 0) &
+        (us_stocks[col_name].notna())
+        ]
+
+    return us_stocks
 
     # Select ranking method
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -433,7 +606,7 @@ def fetch_data_by_method(date: dt.date, us_stocks: pd.DataFrame, method: str) ->
         # Setup executor
         future_data = {
             executor.submit(func, symbol, request_date=request_report_date):
-                symbol for symbol in us_stocks['Symbol']
+                symbol for symbol in us_stocks['Ticker']
         }
 
         # Get result
@@ -442,7 +615,7 @@ def fetch_data_by_method(date: dt.date, us_stocks: pd.DataFrame, method: str) ->
             if future.exception():
                 logging.warning("Future's exception: ", future.exception())
             else:
-                us_stocks.loc[us_stocks['Symbol'] == symbol, col_name] = future.result()
+                us_stocks.loc[us_stocks['Ticker'] == symbol, col_name] = float(future.result())
 
     # Filter out zero and NaN
     us_stocks_filtered = us_stocks[
@@ -467,7 +640,8 @@ def fetch_percent_changed(df: pd.DataFrame, start_date: str, end_date: str) -> f
 def extract_date_suffix(date_str: str) -> dt.datetime | None:
     date_pattern = re.compile(r'-(\w+ \d{2})$')
     match = date_pattern.search(date_str)
-    return pd.to_datetime(match.group(1), format='%b %y') if match else None
+    return dt.datetime.strptime(match.group(1), '%b %y') if match else None
+    # return pd.to_datetime(match.group(1), format='%b %y') if match else None
 
 
 def reorder_dataframe_columns(df: pd.DataFrame, method: str) -> pd.DataFrame:
@@ -484,7 +658,7 @@ def reorder_dataframe_columns(df: pd.DataFrame, method: str) -> pd.DataFrame:
     cols.sort(key=extract_date_suffix)
     other_cols = [col for col in df.columns if col not in cols]
     df = df.reindex(columns=other_cols + cols)
-    df.sort_values(by='Symbol', inplace=True)
+    df.sort_values(by='Ticker', inplace=True)
     df.reset_index(inplace=True, drop=True)
 
     return df

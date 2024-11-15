@@ -215,9 +215,9 @@
             tables[i].style.border = '1px solid #bbb';
         }
 
-        // Add left border to all symbol columns
+        // Add left border to all ticker columns
         for (let i = 0; i < heads.length; i++) {  // i starts from 1 because i need to ignore the first comlumn
-            if (heads[i].textContent === 'Symbol') {
+            if (heads[i].textContent === 'Ticker') {
                 const symbolColumnIndex = heads[i].cellIndex;
                 heads[i].style.borderLeft = '1px solid #bbb';
 

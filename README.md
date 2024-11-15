@@ -1,10 +1,15 @@
-## To initialize the database
+## To install psycopg2 to connect to the postgres database
+> pip install psycopg2-binary
+
+## Initialize the database
 - Go to https://www.nasdaq.com/market-activity/stocks/screener to download the stocks list csv
 - Save the csv file to static/stock_list folder
 - Run command in terminal
 > python manage.py init_db
+- The default period of candlestick data is last 3-years
 
-## To maintain the database, keep the financial data up to date
+## Maintain the database, keep the financial data up to date
 - Add columns to the models: FinancialReport, BalanceSheet, CashFlow, IncomeStatement (monthly)
 - Run the above command 'python manage.py init_db' ( monthly)
-# InvestmentWeb
+
+## Have tried to download the candlestick data from yfinance (python api), it takes 1 min to download and write candlestick data to the database (for 10 stocks)

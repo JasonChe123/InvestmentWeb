@@ -26,27 +26,117 @@
         <div id="backtest_params_area" class="collapse show">
             <form action="{% url 'longshort-backtest' %}" method="post">
                 {% csrf_token %}
+                <!-- Parameters -->
                 <div class="row">
                     <!-- Market Cap -->
-                    <div class="col-md-3 form-group">
+                    <div class="col-md-3">
                         <label>Market Cap</label>
                         <div class="card">
-                            <div class="card-body">
+                            <div class="card-body ">
                                 {% for mc in market_cap %}
-                                <input class="form-check-input" type="checkbox" id={{ mc }} name="market_cap"
-                                       {% if mc in selected_market_cap %}checked{% endif %} value="{{ mc }}">
-                                <label class="form-check-label" for={{ mc }}>{{ mc }}</label>
-                                <br>
+                                <div class="col-md-12 my-1">
+                                    <input class="form-check-input" type="checkbox" id={{ mc }} name="market_cap"
+                                           {% if mc in selected_market_cap %}checked{% endif %} value="{{ mc }}">
+                                    <label class="form-check-label" for={{ mc }}>{{ mc }}</label>
+                                </div>
                                 {% endfor %}
                             </div>
                         </div>
                     </div>
 
+                    <!-- Methods -->
+                    <div class="col-md-9">
+                        <label>Methods</label>
+                        <!-- Methods -->
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Financial -->
+                                    <div class="form-group col-md-3">
+                                        <label for="methods_financial">Income Statement</label>
+                                        <select id="methods_financial" name='methods_financial'
+                                                class="form-control method-selector">
+                                            {% for m in methods_financial %}
+                                            {% if m == selected_financial_method %}
+                                            <option selected>{{ m }}</option>
+                                            {% else %}
+                                            <option>{{ m }}</option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+
+                                    <!-- Balance Sheet -->
+                                    <div class="form-group col-md-3">
+                                        <label for="methods_balance_sheet">Balance Sheet</label>
+                                        <select id="methods_balance_sheet" name='methods_balance_sheet'
+                                                class="form-control method-selector">
+                                            {% for m in methods_balance_sheet %}
+                                            {% if m == selected_balance_sheet_method %}
+                                            <option selected>{{ m }}</option>
+                                            {% else %}
+                                            <option>{{ m }}</option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+
+                                    <!-- Cash Flow -->
+                                    <div class="form-group col-md-3">
+                                        <label for="methods_cash_flow">Cash Flow</label>
+                                        <select id="methods_cash_flow" name='methods_cash_flow'
+                                                class="form-control method-selector">
+                                            {% for m in methods_cash_flow %}
+                                            {% if m == selected_cash_flow_method %}
+                                            <option selected>{{ m }}</option>
+                                            {% else %}
+                                            <option>{{ m }}</option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+
+                                    <!-- Operator buttons -->
+                                    <div class="col-md-3 my-auto text-end">
+                                        <button type="button" class="btn btn-outline-secondary operator"
+                                                style="width: 40px;" value="+">+
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary operator"
+                                                style="width: 40px;" value="-">-
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary operator"
+                                                style="width: 40px;" value="*">x
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary operator"
+                                                style="width: 40px;" value="/">/
+                                        </button>
+                                        <br>
+                                        <button type="button" class="btn btn-outline-secondary operator"
+                                                style="width: 40px;" disabled>(
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary operator"
+                                                style="width: 40px;" disabled>)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                Selected Method:<br>
+                                <b id="selected_method" class="py-3">
+                                    {% if selected_method %} {{ selected_method }} {% else %} Please select a method...
+                                    {% endif %}
+                                </b>
+                                <input type="hidden" name="selected_method" id="selected_method_input"
+                                       {% if selected_method %} value="{{ selected_method }}" {% endif %}>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Other params -->
-                    <div class="col-md-8">
-                        <div class="row">
+                    <div class="col-md-12">
+                        <div class="row my-3">
                             <!-- Ipo years -->
-                            <div class="form-group col-md-4 mb-3">
+                            <div class="form-group col-md-2">
                                 <label for="ipo_years">Min IPO Years</label>
                                 <select id="ipo_years" name='ipo_years' class="form-control">
                                     {% for y in ipo_years %}
@@ -58,21 +148,9 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <!-- Method -->
-                            <div class="form-group col-md-4 mb-3">
-                                <label for="method">Method</label>
-                                <select id="method" name='method' class="form-control">
-                                    {% for m in methods %}
-                                    {% if m == selected_method %}
-                                    <option selected>{{ m }}</option>
-                                    {% else %}
-                                    <option>{{ m }}</option>
-                                    {% endif %}
-                                    {% endfor %}
-                                </select>
-                            </div>
+
                             <!-- Sectors -->
-                            <div class="form-group col-md-4 mb-3">
+                            <div class="form-group col-md-2">
                                 <label for="sectors">Sector</label>
                                 <select id="sectors" name="sectors" class="form-control">
                                     {% for s in sectors %}
@@ -84,8 +162,9 @@
                                     {% endfor %}
                                 </select>
                             </div>
+
                             <!-- Backtest years -->
-                            <div class="form-group col-md-4 mb-3">
+                            <div class="form-group col-md-2">
                                 <label for="backtest_years">Backtest Years</label>
                                 <select id="backtest_years" name="backtest_years" class="form-control">
                                     {% for y in backtest_years %}
@@ -97,8 +176,9 @@
                                     {% endfor %}
                                 </select>
                             </div>
+
                             <!-- Positions hold -->
-                            <div class="form-group col-md-4 mb-3">
+                            <div class="form-group col-md-2">
                                 <label for="pos_hold">Position</label>
                                 <select id="pos_hold" name="pos_hold" class="form-control">
                                     {% for p in pos_hold %}
@@ -110,9 +190,24 @@
                                     {% endfor %}
                                 </select>
                             </div>
+
+                            <!-- Ranking methods -->
+                            <div class="form-group col-md-2">
+                                <label for="ranking_method">Ranking Method</label>
+                                <select id="ranking_method" name="ranking_method" class="form-control">
+                                    {% if selected_ranking_method == 'Descending' %}
+                                    <option selected>Descending</option>
+                                    <option>Ascending</option>
+                                    {% else %}
+                                    <option>Descending</option>
+                                    <option selected>Ascending</option>
+                                    {% endif %}
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
+
                 <!-- Submit button -->
                 <div class="col-md-1 mt-3">
                     <button type="submit" class="btn btn-primary col-md-12">Start</button>
@@ -237,6 +332,50 @@
         });
         backtest_params_area.addEventListener('hidden.bs.collapse', function () {
             collapse_params_button.innerText = "Show";
+        });
+
+        // Selected method
+        const selected_method = document.getElementById("selected_method");
+        const selected_method_input = document.getElementById("selected_method_input");
+        document.querySelectorAll('.method-selector').forEach(function (method_selector) {
+            method_selector.addEventListener('change', function () {
+                // The last string is +, -, *, /
+                if (/[\+\-\*\/]$/.test(selected_method.innerText)) {
+                    selected_method.innerText += " " + this.value;
+                    selected_method_input.value += " " + this.value;
+                } else if (/[\+\-\*\/]/.test(selected_method.innerText)) { // The string includes +, -, *, /
+                    // Get the last index of +, -, *, / and a method string afterward
+                    const lastOperatorIndex = selected_method.innerText.search(/[\+\-\*\/][^+\-*/]*$/);
+                    if (lastOperatorIndex !== -1) {
+                        // Replace the last method string
+                        const newString = selected_method.innerText.slice(0, lastOperatorIndex + 2) + this.value;
+                        selected_method.innerText = newString;
+                        selected_method_input.value = newString;
+                    }
+                } else {
+                    selected_method.innerText = this.value;
+                    selected_method_input.value = this.value;
+                }
+            });
+        });
+
+        // Operator event
+        document.querySelectorAll('.operator').forEach(function (operator) {
+            operator.addEventListener('click', function () {
+                if (selected_method_input.value === "") {
+                    return;
+                }
+                // The last string is +, -, *, /
+                if (/[\+\-\*\/)]$/.test(selected_method.innerText)) {
+                    // Replace the last operator
+                    selected_method.innerText = selected_method.innerText.slice(0, -1) + this.value;
+                    selected_method_input.value = selected_method_input.value.slice(0, -1) + this.value;
+                } else {
+                    // Add operator
+                    selected_method.innerText += " " + this.value;
+                    selected_method_input.value += " " + this.value;
+                }
+            });
         });
     });
 </script>

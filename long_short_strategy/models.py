@@ -199,55 +199,6 @@ class CashFlow(models.Model):
     NetIncomeFromContinuingOperations = models.BigIntegerField(null=True)
 
 
-class IncomeStatement(models.Model):
-    """
-    The column names are the same as the income statement from yfinance but without spaces
-    """
-    stock = models.ForeignKey(Stock, on_delete=models.CASCADE)
-    date = models.DateField(null=True)
-
-    # Column names from yfinance->quarterly income statement
-    TaxEffectOfUnusualItems = models.DecimalField(max_digits=20, decimal_places=2, null=True)
-    TaxRateForCalcs = models.DecimalField(max_digits=20, decimal_places=2, null=True)
-    NormalizedEBITDA = models.BigIntegerField(null=True)
-    NetIncomeFromContinuingOperationNetMinorityInterest = models.BigIntegerField(null=True)
-    ReconciledDepreciation = models.BigIntegerField(null=True)
-    ReconciledCostOfRevenue = models.BigIntegerField(null=True)
-    EBITDA = models.BigIntegerField(null=True)
-    EBIT = models.BigIntegerField(null=True)
-    NetInterestIncome = models.BigIntegerField(null=True)
-    InterestExpense = models.BigIntegerField(null=True)
-    InterestIncome = models.BigIntegerField(null=True)
-    NormalizedIncome = models.BigIntegerField(null=True)
-    NetIncomeFromContinuingAndDiscontinuedOperation = models.BigIntegerField(null=True)
-    TotalExpenses = models.BigIntegerField(null=True)
-    TotalOperatingIncomeAsReported = models.BigIntegerField(null=True)
-    DilutedAverageShares = models.BigIntegerField(null=True)
-    BasicAverageShares = models.BigIntegerField(null=True)
-    DilutedEPS = models.DecimalField(max_digits=20, decimal_places=2, null=True)
-    BasicEPS = models.DecimalField(max_digits=20, decimal_places=2, null=True)
-    DilutedNIAvailtoComStockholders = models.BigIntegerField(null=True)
-    NetIncomeCommonStockholders = models.BigIntegerField(null=True)
-    NetIncome14736000000 = models.BigIntegerField(null=True)
-    NetIncomeIncludingNoncontrollingInterests = models.BigIntegerField(null=True)
-    NetIncomeContinuousOperations = models.BigIntegerField(null=True)
-    TaxProvision14874000000 = models.BigIntegerField(null=True)
-    PretaxIncome = models.BigIntegerField(null=True)
-    OtherIncomeExpense = models.BigIntegerField(null=True)
-    OtherNonOperatingIncomeExpenses = models.BigIntegerField(null=True)
-    NetNonOperatingInterestIncomeExpense = models.BigIntegerField(null=True)
-    InterestExpenseNonOperating = models.BigIntegerField(null=True)
-    InterestIncomeNonOperating = models.BigIntegerField(null=True)
-    OperatingIncome = models.BigIntegerField(null=True)
-    OperatingExpense = models.BigIntegerField(null=True)
-    ResearchAndDevelopment = models.BigIntegerField(null=True)
-    SellingGeneralAndAdministration = models.BigIntegerField(null=True)
-    GrossProfit = models.BigIntegerField(null=True)
-    CostOfRevenue = models.BigIntegerField(null=True)
-    TotalRevenue = models.BigIntegerField(null=True)
-    OperatingRevenue = models.BigIntegerField(null=True)
-
-
 class CandleStick(models.Model):
     stock = models.ForeignKey(Stock, on_delete=models.CASCADE)
     date = models.DateTimeField()

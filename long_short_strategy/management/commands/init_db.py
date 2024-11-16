@@ -1,9 +1,8 @@
 import datetime as dt
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db import models
 import logging
-from long_short_strategy.models import Stock, FinancialReport, BalanceSheet, CashFlow, IncomeStatement, CandleStick
+from long_short_strategy.models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
 import numpy as np
 import os
 import pandas as pd
@@ -74,9 +73,6 @@ class Command(BaseCommand):
 
             cash_flow = yf.Ticker(symbol).quarterly_cash_flow
             update_reports(cash_flow, stock, CashFlow)
-
-            income_statement = yf.Ticker(symbol).quarterly_income_stmt
-            update_reports(income_statement, stock, IncomeStatement)
 
         # Success message
         self.stdout.write(self.style.SUCCESS("Financial data 'UPDATE' success!"))
@@ -175,7 +171,7 @@ def update_candlestick_db(stock_list: pd.DataFrame):
 
 def update_reports(report: pd.DataFrame,
                    stock: Stock,
-                   model: Type[FinancialReport | BalanceSheet | CashFlow | IncomeStatement]):
+                   model: Type[FinancialReport | BalanceSheet | CashFlow]):
     # Prepare list to bulk update
     report_list = []
 

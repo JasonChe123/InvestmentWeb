@@ -1,9 +1,14 @@
 import calendar
 import datetime as dt
+from calendar import monthrange
+from re import search
+
 from django.contrib import messages
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.views import View
+import json
 import logging
 import numpy as np
 import pandas as pd
@@ -11,20 +16,15 @@ import re
 from typing import Type
 from .models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
 
-market_cap_str = ['Mega (>$200B)',
-                  'Large ($10B-$200B)',
-                  'Medium ($2B-$10B)',
-                  'Small ($300M-$2B)',
-                  'Micro ($50M-$300M)',
-                  'Nano (<$50M)',
-                  ]
-market_cap_value = [200_000_000_000,
-                    range(10_000_000_000, 20_000_000_001),
-                    range(2_000_000_000, 10_000_000_001),
-                    range(300_000_000, 2_000_000_001),
-                    range(50_000_000, 300_000_001),
-                    range(0, 50_000_001),
-                    ]
+
+market_cap = {
+    'Mega (>$200B)': 200_000_000_000,
+    'Large ($10B-$200B)': range(10_000_000_000, 20_000_000_001),
+    'Medium ($2B-$10B)': range(2_000_000_000, 10_000_000_001),
+    'Small ($300M-$2B)': range(300_000_000, 2_000_000_001),
+    'Micro ($50M-$300M)': range(50_000_000, 300_000_001),
+    'Nano (<$50M)': range(0, 50_000_001),
+}
 
 
 class DashboardView(View):
@@ -36,18 +36,16 @@ class BackTestView(View):
     def __init__(self):
         super().__init__()
 
-        # Setup market
-        self.market_cap = {}
-        for s, v in zip(market_cap_str, market_cap_value):
-            self.market_cap[s] = v
+        # Setup market cap
+        self.market_cap = market_cap
 
-        # Setup methods
-        self.methods_financial = [separate_words(field.name) for field in FinancialReport._meta.get_fields() if
-                                  field.concrete and field.name not in ('id', 'stock', 'date')]
-        self.methods_balance_sheet = [separate_words(field.name) for field in BalanceSheet._meta.get_fields() if
-                                      field.concrete and field.name not in ('id', 'stock', 'date')]
-        self.methods_cash_flow = [separate_words(field.name) for field in CashFlow._meta.get_fields() if
-                                  field.concrete and field.name not in ('id', 'stock', 'date')]
+        # Setup fundamental data
+        self.financials_data = [separate_words(field.name) for field in FinancialReport._meta.get_fields() if
+                                field.concrete and field.name not in ('id', 'stock', 'date')]
+        self.balance_sheet_data = [separate_words(field.name) for field in BalanceSheet._meta.get_fields() if
+                                   field.concrete and field.name not in ('id', 'stock', 'date')]
+        self.cash_flow_data = [separate_words(field.name) for field in CashFlow._meta.get_fields() if
+                               field.concrete and field.name not in ('id', 'stock', 'date')]
 
         # Setup other parameters
         self.ipo_years = [5, 4, 3, 2, 1]
@@ -65,9 +63,9 @@ class BackTestView(View):
 
         # Setup html context
         self.html_context = {
-            'methods_financial': self.methods_financial,
-            'methods_balance_sheet': self.methods_balance_sheet,
-            'methods_cash_flow': self.methods_cash_flow,
+            'methods_financial': self.financials_data,
+            'methods_balance_sheet': self.balance_sheet_data,
+            'methods_cash_flow': self.cash_flow_data,
             'market_cap': self.market_cap.keys(),
             'ipo_years': self.ipo_years,
             'sectors': self.sectors,
@@ -75,9 +73,8 @@ class BackTestView(View):
             'pos_hold': self.pos_hold,
         }
 
-        self.candle_stick_data = {}
-
     def get(self, request):
+        # Default parameters
         self.html_context['selected_market_cap'] = list(self.market_cap.keys())[:3]
         self.html_context['selected_ipo_years'] = 1
         self.html_context['selected_backtest_years'] = 1.5
@@ -106,39 +103,45 @@ class BackTestView(View):
         self.html_context['selected_ranking_method'] = ranking_method
 
         # Check input validity
-        if not market_cap or not method:
-            messages.warning(request, 'No stocks found, please adjust your filter.')
+        if not market_cap:
+            messages.warning(request, 'Please select Market Cap.')
+            return render(request, 'long_short/backtest.html', self.html_context)
+        if not method:
+            messages.warning(request, 'Please select Method.')
+            return render(request, 'long_short/backtest.html', self.html_context)
+        if method.count('(') != method.count(')'):
+            messages.warning(request, 'Your method is not valid, please check.')
             return render(request, 'long_short/backtest.html', self.html_context)
 
-        # Get US stocks dataframe
-        us_stocks = get_us_stocks(market_cap, ipo_years, [sector, ])
-        if len(us_stocks) == 0:
+        # Get US stocks
+        df_us_stocks = get_us_stocks(market_cap, ipo_years, [sector, ])
+        if len(df_us_stocks) == 0:
             messages.warning(request, 'No stocks found, please adjust your filter.')
             return render(request, 'long_short/backtest.html', self.html_context)
 
         # Get re-balancing dates
-        re_balancing_dates = get_re_balancing_dates(self.re_balancing_months[1], backtest_years)
+        l_re_balancing_dates = get_re_balancing_dates(self.re_balancing_months[1], backtest_years)
 
         # Get result by method chose
         results = get_result_from_method(
-            method, us_stocks, re_balancing_dates,
-            self.methods_financial, self.methods_balance_sheet, self.methods_cash_flow
+            method, df_us_stocks, l_re_balancing_dates,
+            self.financials_data, self.balance_sheet_data, self.cash_flow_data
         )
 
         return render(request, 'long_short/backtest.html', self.html_context)
 
-        merged_results = us_stocks.copy()
-        if method in self.methods_financial:
+        merged_results = df_us_stocks.copy()
+        if method in self.financials_data:
             report_table = FinancialReport
-        elif method in self.methods_balance_sheet:
+        elif method in self.balance_sheet_data:
             report_table = BalanceSheet
-        elif method in self.methods_cash_flow:
+        elif method in self.cash_flow_data:
             report_table = CashFlow
         else:
             messages.warning(request, "Unknown method.")
-        for date in re_balancing_dates:
+        for date in l_re_balancing_dates:
             # Add result columns to us_stocks dataframe
-            result = fetch_data_by_method(date, us_stocks.copy(), method, report_table)
+            result = fetch_data_by_method(date, df_us_stocks.copy(), method, report_table)
             result = result[['Ticker', result.columns[-1]]]
             merged_results = pd.merge(merged_results, result, on='Ticker', how='left')
 
@@ -239,6 +242,29 @@ class BackTestView(View):
         return render(request, 'long_short/backtest.html', self.html_context)
 
 
+def search_method(request):
+    """
+    Search the method in Income Statement, Balance Sheet and Cash Flow, and return to the front-end.
+    :param request: Request
+    :return: {result: [method1, method2, ...]}
+    """
+    if request.method == 'POST':
+        search_str = json.loads(request.body).get('search_text')
+        if search_str.strip() == '':
+            return JsonResponse({'result': []})
+
+        fields_financials = [separate_words(field.name) for field in FinancialReport._meta.get_fields() if
+                             field.concrete and field.name not in ('id', 'stock', 'date')]
+        fields_balancesheet = [separate_words(field.name) for field in BalanceSheet._meta.get_fields() if
+                               field.concrete and field.name not in ('id', 'stock', 'date')]
+        fields_cashflow = [separate_words(field.name) for field in CashFlow._meta.get_fields() if
+                           field.concrete and field.name not in ('id', 'stock', 'date')]
+        all_fields = fields_financials + fields_balancesheet + fields_cashflow
+        results = [method for method in all_fields if search_str.lower() in method.lower()]
+
+        return JsonResponse({'result': results})
+
+
 def separate_words(string: str) -> str:
     """
     To separate words, e.g. from 'ResearchAndDevelopment' to 'Research And Development'
@@ -246,14 +272,17 @@ def separate_words(string: str) -> str:
     return re.sub(r"(?<![A-Z])(?=[A-Z])", " ", string).strip()
 
 
-def get_us_stocks(market_cap: list, min_ipo_years: int, sectors: list) -> pd.DataFrame:
+def get_us_stocks(selected_market_cap: list, min_ipo_years: int, sectors: list) -> pd.DataFrame:
+    market_cap_str = list(market_cap.keys())
+    market_cap_value = list(market_cap.values())
+
     # Get selected market cap
-    mega = market_cap_str[0] in market_cap
-    large = market_cap_str[1] in market_cap
-    medium = market_cap_str[2] in market_cap
-    small = market_cap_str[3] in market_cap
-    micro = market_cap_str[4] in market_cap
-    nano = market_cap_str[5] in market_cap
+    mega = market_cap_str[0] in selected_market_cap
+    large = market_cap_str[1] in selected_market_cap
+    medium = market_cap_str[2] in selected_market_cap
+    small = market_cap_str[3] in selected_market_cap
+    micro = market_cap_str[4] in selected_market_cap
+    nano = market_cap_str[5] in selected_market_cap
 
     # Define query
     mega_q = Q(market_cap__gte=market_cap_value[0]) if mega else Q()
@@ -317,19 +346,75 @@ def get_re_balancing_dates(re_balancing_months: str, backtest_years: float = 1) 
     return re_balancing_dates
 
 
-def get_result_from_method(method: str,
+def get_result_from_method(formula: str,
                            us_stocks: pd.DataFrame,
                            re_balancing_dates: list,
-                           methods_financial: Type[FinancialReport],
-                           methods_balance_sheet: Type[BalanceSheet],
-                           methods_cash_flow: Type[CashFlow]) -> pd.DataFrame:
-    # Extract the method names
-    method_names = re.findall(r'\w+(?:\s+\w+)*', method)
+                           financials_data: list,  # ['Basic EPS', 'EPS', ...]
+                           balance_sheet_data: list,
+                           cash_flow_data: list) -> pd.DataFrame:
+    # Extract data name from method
+    datas = re.findall(r'\w+(?:\s+\w+)*', formula)
 
-    # Get the value of each method todo: to be continue...
-    print()
-    print("method_name: ", method_names)
-    print()
+    # Setup columns and Initialize result
+    result = us_stocks[['Ticker']].copy()
+
+    # Loop through re-balancing dates
+    for date in re_balancing_dates:
+        # Get report date (1 month earlier than the re-balancing date)
+        report_date = (date - dt.timedelta(days=32))
+        report_date = report_date.replace(day=monthrange(report_date.year, report_date.month)[-1])
+
+        # Initialize data columns
+        for data in datas:
+            result[data] = np.nan
+
+        # Loop through stocks
+        for index, row in result.iterrows():
+            stock = Stock.objects.get(ticker=row['Ticker'])
+
+            # Loop through methods
+            for data in datas:
+                # Data name aligns with the database
+                data_db = data.replace(' ', '').strip()
+
+                if data in financials_data:
+                    report = FinancialReport.objects.filter(stock=stock, date=report_date)
+                    if not report: continue
+                elif data in balance_sheet_data:
+                    report = BalanceSheet.objects.filter(stock=stock, date=report_date)
+                    if not report: continue
+                elif data in cash_flow_data:
+                    report = CashFlow.objects.filter(stock=stock, date=report_date)
+                    if not report: continue
+                else:
+                    continue
+
+                # Set data
+                value = getattr(report.first(), data_db)
+                if value:
+                    result.loc[index, data] = float(value)
+                else:
+                    result.loc[index, data] = np.nan
+
+        # Calculate result
+        result_col_name = f'result-{dt.date.strftime(report_date, "%b %y")}'
+        result = apply_formula(result, formula, result_col_name)
+
+        # Delete data columns
+        result.drop(columns=datas, inplace=True)
+
+    return result  # todo: to be continue...
+
+
+def apply_formula(df: pd.DataFrame, formula: str, result_col_name: str) -> pd.DataFrame:
+    # Replace columns names
+    for col in df.columns:
+        formula = formula.replace(col, f'df["{col}"]')
+
+    # Evaluate
+    df[result_col_name] = eval(formula)
+
+    return df
 
 
 def fetch_data_by_method(date: dt.date, us_stocks: pd.DataFrame, method: str,

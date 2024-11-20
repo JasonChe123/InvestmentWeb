@@ -50,7 +50,20 @@
                         <!-- Methods -->
                         <div class="card">
                             <div class="card-body">
+                                <!-- search bar -->
                                 <div class="row">
+                                    <div class="col-md-12">
+                                        <!-- search bar -->
+                                        <div class="form-group mb-0">
+                                            <input type="text" class="form-control" id="search-field"
+                                                   placeholder="Search">
+                                        </div>
+                                        <div class="dropdown-menu" id="search-result"></div>
+                                    </div>
+                                </div>
+
+                                <!-- other fields -->
+                                <div class="row mt-3">
                                     <!-- Financial -->
                                     <div class="form-group col-md-3">
                                         <label for="methods_financial">Income Statement</label>
@@ -97,26 +110,32 @@
                                     </div>
 
                                     <!-- Operator buttons -->
-                                    <div class="col-md-3 my-auto text-end">
-                                        <button type="button" class="btn btn-outline-secondary operator"
-                                                style="width: 40px;" value="+">+
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary operator"
-                                                style="width: 40px;" value="-">-
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary operator"
-                                                style="width: 40px;" value="*">x
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary operator"
-                                                style="width: 40px;" value="/">/
-                                        </button>
-                                        <br>
-                                        <button type="button" class="btn btn-outline-secondary operator"
-                                                style="width: 40px;" disabled>(
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary operator"
-                                                style="width: 40px;" disabled>)
-                                        </button>
+                                    <div class="col-md-3 my-auto">
+                                        <div class="row">
+                                            <button type="button" class="btn btn-outline-primary operator me-1"
+                                                    style="width: 40px;" value="+">+
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary operator me-1"
+                                                    style="width: 40px;" value="-">-
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary operator me-1"
+                                                    style="width: 40px;" value="*">x
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary operator me-1"
+                                                    style="width: 40px;" value="/">/
+                                            </button>
+                                        </div>
+                                        <div class="row mt-1">
+                                            <button type="button" class="btn btn-outline-secondary operator me-1"
+                                                    style="width: 40px;" value="(">(
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary operator me-1"
+                                                    style="width: 40px;" value=")">)
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger operator me-1"
+                                                    style="width: 85px;" value="AC">AC
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -127,7 +146,8 @@
                                     {% endif %}
                                 </b>
                                 <input type="hidden" name="selected_method" id="selected_method_input"
-                                       {% if selected_method %} value="{{ selected_method }}" {% endif %}>
+                                       {% if selected_method %} value="{{ selected_method }}"
+                                       {% else %} value="" {% endif %}>
                             </div>
                         </div>
                     </div>
@@ -223,7 +243,8 @@
         {% include 'partials/_messages.html' %}
         <h4 class="my-3">
             Backtest Result for Top {{ selected_pos_hold }} and
-            Bottom {{ selected_pos_hold }} ranked by {{ selected_method }}
+            Bottom {{ selected_pos_hold }} ranked by:<br>
+            {{ selected_method }}
         </h4>
         <!-- Top Stocks -->
         <div class="row">
@@ -280,103 +301,5 @@
 </div>
 
 <!-- Script -->
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Add new-line before and after 'to' in all table headers
-        const heads = document.getElementsByTagName('th');
-        for (let i = 0; i < heads.length; i++) {
-            heads[i].innerHTML = heads[i].innerHTML.replaceAll(" to ", "<br>to<br>");
-        }
-
-        // Change color to 'red' for negative values, and align all numbers to the right
-        const cells = document.getElementsByTagName('td');
-        for (let i = 0; i < cells.length; i++) {
-            const value = parseFloat(cells[i].textContent);
-
-            // Align all numbers to the right
-            if (typeof (value) === 'number' && !isNaN(value)) {
-                cells[i].style.textAlign = 'right';
-            }
-
-            // Change color of negative values
-            if (!isNaN(value) && value < 0) {
-                cells[i].style.color = 'red';
-            }
-        }
-
-        // Add border to all tables
-        const tables = document.getElementsByTagName('table');
-        for (let i = 0; i < tables.length; i++) {
-            tables[i].style.border = '1px solid #bbb';
-        }
-
-        // Add left border to all ticker columns
-        for (let i = 0; i < heads.length; i++) {  // i starts from 1 because i need to ignore the first comlumn
-            if (heads[i].textContent === 'Ticker') {
-                const symbolColumnIndex = heads[i].cellIndex;
-                heads[i].style.borderLeft = '1px solid #bbb';
-
-                for (let j = 0; j < cells.length; j++) {
-                    if (cells[j].cellIndex === symbolColumnIndex) {
-                        cells[j].style.borderLeft = '1px solid #bbb';
-                    }
-                }
-            }
-        }
-
-        // Toggle show/ hide text in collapse button
-        var collapse_params_button = document.getElementById('collapse_params_button');
-        var backtest_params_area = document.getElementById('backtest_params_area');
-        backtest_params_area.addEventListener('show.bs.collapse', function () {
-            collapse_params_button.innerText = "Hide";
-        });
-        backtest_params_area.addEventListener('hidden.bs.collapse', function () {
-            collapse_params_button.innerText = "Show";
-        });
-
-        // Selected method
-        const selected_method = document.getElementById("selected_method");
-        const selected_method_input = document.getElementById("selected_method_input");
-        document.querySelectorAll('.method-selector').forEach(function (method_selector) {
-            method_selector.addEventListener('change', function () {
-                // The last string is +, -, *, /
-                if (/[\+\-\*\/]$/.test(selected_method.innerText)) {
-                    selected_method.innerText += " " + this.value;
-                    selected_method_input.value += " " + this.value;
-                } else if (/[\+\-\*\/]/.test(selected_method.innerText)) { // The string includes +, -, *, /
-                    // Get the last index of +, -, *, / and a method string afterward
-                    const lastOperatorIndex = selected_method.innerText.search(/[\+\-\*\/][^+\-*/]*$/);
-                    if (lastOperatorIndex !== -1) {
-                        // Replace the last method string
-                        const newString = selected_method.innerText.slice(0, lastOperatorIndex + 2) + this.value;
-                        selected_method.innerText = newString;
-                        selected_method_input.value = newString;
-                    }
-                } else {
-                    selected_method.innerText = this.value;
-                    selected_method_input.value = this.value;
-                }
-            });
-        });
-
-        // Operator event
-        document.querySelectorAll('.operator').forEach(function (operator) {
-            operator.addEventListener('click', function () {
-                if (selected_method_input.value === "") {
-                    return;
-                }
-                // The last string is +, -, *, /
-                if (/[\+\-\*\/)]$/.test(selected_method.innerText)) {
-                    // Replace the last operator
-                    selected_method.innerText = selected_method.innerText.slice(0, -1) + this.value;
-                    selected_method_input.value = selected_method_input.value.slice(0, -1) + this.value;
-                } else {
-                    // Add operator
-                    selected_method.innerText += " " + this.value;
-                    selected_method_input.value += " " + this.value;
-                }
-            });
-        });
-    });
-</script>
+<script src="{% static 'js/backtest.js' %}"></script>
 {% endblock content %}

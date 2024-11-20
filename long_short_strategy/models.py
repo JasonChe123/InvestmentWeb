@@ -11,7 +11,7 @@ class Stock(models.Model):
     market_cap = models.BigIntegerField(null=True)
 
     def __str__(self):
-        return self.symbol
+        return self.ticker
 
 
 class FinancialReport(models.Model):

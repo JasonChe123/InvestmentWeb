@@ -11,5 +11,3 @@
 ## Maintain the database, keep the financial data up to date
 - Add columns to the models: FinancialReport, BalanceSheet, CashFlow, IncomeStatement (monthly)
 - Run the above command 'python manage.py init_db' ( monthly)
-
-## Have tried to download the candlestick data from yfinance (python api), it takes 1 min to download and write candlestick data to the database (for 10 stocks)

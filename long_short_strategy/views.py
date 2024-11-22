@@ -146,8 +146,8 @@ class BackTestView(View):
             df.replace(np.nan, "", inplace=True)
 
         # Round to 2 decimals
-        df_top = df_top.applymap(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
-        df_bottom = df_bottom.applymap(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
+        df_top = df_top.map(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
+        df_bottom = df_bottom.map(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
 
         # Rename column names from 'result-%b %y' to '%m/%y-%m/%y'
         rename_cols = {}
@@ -159,9 +159,30 @@ class BackTestView(View):
                     to_date = from_date.replace(year=from_date.year + 1, month=to_month - 12)
                 else:
                     to_date = from_date.replace(month=to_month)
-                rename_cols[col] = f'{from_date.strftime("%m/%y")}-{to_date.strftime("%m/%y")}'
+                rename_cols[col] = f'{from_date.strftime("%m/%y")} - {to_date.strftime("%m/%y")}'
         df_top.rename(columns=rename_cols, inplace=True)
         df_bottom.rename(columns=rename_cols, inplace=True)
+
+        # Change unit
+        def divide_columns(df, divisor, column_contains):
+            # Select columns that match the pattern
+            cols = df.columns[df.columns.str.contains(column_contains)]
+
+            # Divide the selected columns by the divisor
+            df[cols] = df[cols].map(
+                lambda x: round(x / divisor, 2) if isinstance(x, (int, float)) and not np.isnan(x) else x
+            )
+
+            return df
+
+        max_value = max(pd.to_numeric(df_top.loc[0], errors='coerce').dropna())
+        for df in (df_top, df_bottom):
+            if max_value > 1_000_000_000:
+                divide_columns(df, 1_000_000_000, '-')
+            elif max_value > 1_000_000:
+                divide_columns(df, 1_000_000, '-')
+            elif max_value > 1_000:
+                divide_columns(df, 1_000, '-')
 
         # Set html context
         self.html_context['df_top'] = df_top

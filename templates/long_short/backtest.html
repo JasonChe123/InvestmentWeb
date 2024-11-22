@@ -241,11 +241,13 @@
 <div class="row">
     <div class="col-md-12">
         {% include 'partials/_messages.html' %}
+        <!-- Title -->
         <h4 class="my-3">
             Backtest Result for Top {{ selected_pos_hold }} and
             Bottom {{ selected_pos_hold }} ranked by:<br>
             {{ selected_method }}
         </h4>
+        <p>(The unit of ranking result is either billion, million or thousand if the value > 1,000)</p>
         <!-- Top Stocks -->
         <div class="row">
             <p>

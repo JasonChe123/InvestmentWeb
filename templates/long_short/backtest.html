@@ -241,63 +241,65 @@
 <div class="row">
     <div class="col-md-12">
         {% include 'partials/_messages.html' %}
-        <!-- Title -->
-        <h4 class="my-3">
-            Backtest Result for Top {{ selected_pos_hold }} and
-            Bottom {{ selected_pos_hold }} ranked by:<br>
-            {{ selected_method }}
-        </h4>
-        <p>(The unit of ranking result is either billion, million or thousand if the value > 1,000)</p>
-        <!-- Top Stocks -->
-        <div class="row">
-            <p>
-                Top {{ selected_pos_hold }} Stocks (Total Performance
-                <b {% if long_total < 0 %} style="color: red" {% endif %}> {{ long_total }}%</b>
-                )
-            </p>
-            <table class="table table-sm table-striped">
-                <!-- Header -->
-                <tr>
-                    {% for col in df_top.columns %}
-                    <th class="text-center">{{ col }}</th>
-                    {% endfor %}
-                </tr>
+        <div {% if messages %}class="d-none" {% else %}class="d-block" {% endif %}>
+            <!-- Title -->
+            <h4 class="my-3">
+                Backtest Result for Top {{ selected_pos_hold }} and
+                Bottom {{ selected_pos_hold }} ranked by:<br>
+                {{ selected_method }}
+            </h4>
+            <p>(The unit of ranking result is either billion, million or thousand if the value > 1,000)</p>
+            <!-- Top Stocks -->
+            <div class="row">
+                <p>
+                    Top {{ selected_pos_hold }} Stocks (Total Performance
+                    <b {% if long_total < 0 %} style="color: red" {% endif %}> {{ long_total }}%</b>
+                    )
+                </p>
+                <table class="table table-sm table-striped">
+                    <!-- Header -->
+                    <tr>
+                        {% for col in df_top.columns %}
+                        <th class="text-center">{{ col }}</th>
+                        {% endfor %}
+                    </tr>
 
-                <!-- Data -->
-                {% for i, row in df_top.iterrows %}
-                <tr>
-                    {% for cell in row %}
-                    <td>{{ cell }}</td>
+                    <!-- Data -->
+                    {% for i, row in df_top.iterrows %}
+                    <tr>
+                        {% for cell in row %}
+                        <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
                     {% endfor %}
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
+                </table>
+            </div>
 
-        <!-- Bottom Stocks -->
-        <div class="row">
-            <p>
-                Bottom {{ selected_pos_hold }} Stocks (Total Performance
-                <b {% if short_total < 0 %} style="color: red" {% endif %}>{{ short_total }}%</b>
-                )
-            </p>
-            <table class="table table-sm table-striped">
-                <!-- Header -->
-                <tr>
-                    {% for col in df_bottom.columns %}
-                    <th class="text-center">{{ col }}</th>
-                    {% endfor %}
-                </tr>
+            <!-- Bottom Stocks -->
+            <div class="row">
+                <p>
+                    Bottom {{ selected_pos_hold }} Stocks (Total Performance
+                    <b {% if short_total < 0 %} style="color: red" {% endif %}>{{ short_total }}%</b>
+                    )
+                </p>
+                <table class="table table-sm table-striped">
+                    <!-- Header -->
+                    <tr>
+                        {% for col in df_bottom.columns %}
+                        <th class="text-center">{{ col }}</th>
+                        {% endfor %}
+                    </tr>
 
-                <!-- Data -->
-                {% for i, row in df_bottom.iterrows %}
-                <tr>
-                    {% for cell in row %}
-                    <td>{{ cell }}</td>
+                    <!-- Data -->
+                    {% for i, row in df_bottom.iterrows %}
+                    <tr>
+                        {% for cell in row %}
+                        <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
                     {% endfor %}
-                </tr>
-                {% endfor %}
-            </table>
+                </table>
+            </div>
         </div>
     </div>
 </div>

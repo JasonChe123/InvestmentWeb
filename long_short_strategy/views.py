@@ -10,6 +10,8 @@ import logging
 import numpy as np
 import pandas as pd
 import re
+import time
+import tqdm
 from typing import Tuple
 from .models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
 
@@ -116,7 +118,7 @@ class BackTestView(View):
             return render(request, 'long_short/backtest.html', self.html_context)
 
         # Get re-balancing dates
-        l_re_balancing_dates = get_re_balancing_dates(self.re_balancing_months[2], backtest_years)
+        l_re_balancing_dates = get_re_balancing_dates(self.re_balancing_months[1], backtest_years)
 
         # Get result by method chose
         results = get_result_from_method(
@@ -175,14 +177,15 @@ class BackTestView(View):
 
             return df
 
-        max_value = max(pd.to_numeric(df_top.loc[0], errors='coerce').dropna())
-        for df in (df_top, df_bottom):
-            if max_value > 1_000_000_000:
-                divide_columns(df, 1_000_000_000, '-')
-            elif max_value > 1_000_000:
-                divide_columns(df, 1_000_000, '-')
-            elif max_value > 1_000:
-                divide_columns(df, 1_000, '-')
+        if len(df_top) > 1:
+            max_value = max(pd.to_numeric(df_top.loc[0], errors='coerce').dropna())
+            for df in (df_top, df_bottom):
+                if max_value > 1_000_000_000:
+                    divide_columns(df, 1_000_000_000, '-')
+                elif max_value > 1_000_000:
+                    divide_columns(df, 1_000_000, '-')
+                elif max_value > 1_000:
+                    divide_columns(df, 1_000, '-')
 
         # Set html context
         self.html_context['df_top'] = df_top
@@ -283,48 +286,54 @@ def get_result_from_method(formula: str,
                            financials_data: list,  # ['Basic EPS', 'EPS', ...]
                            balance_sheet_data: list,
                            cash_flow_data: list) -> pd.DataFrame:
-    # Extract data name from method
+    # Extract data names from method
     datas = re.findall(r'\w+(?:\s+\w+)*', formula)
+    datas = [data.replace(' ', '').strip() for data in datas]
 
-    # Setup columns and Initialize result
+    # Format data names - E.g. from 'Basic EPS' to 'BasicEPS'
+    financials_data = [data.replace(' ', '').strip() for data in financials_data]
+    balance_sheet_data = [data.replace(' ', '').strip() for data in balance_sheet_data]
+    cash_flow_data = [data.replace(' ', '').strip() for data in cash_flow_data]
+    formula = formula.replace(' ', '').strip()
+
+    # Get stocks list
     result = us_stocks[['Ticker']].copy()
+    stocks = Stock.objects.filter(ticker__in=list(result['Ticker'].values.tolist()))
 
     # Loop through re-balancing dates
     for date in re_balancing_dates:
-        # Get report date (1 month before the re-balancing date)
-        report_date = date.replace(month=date.month - 2, day=monthrange(date.year, date.month - 2)[-1])
+        # Get report date (1 month before the re-balancing date e.g.31 Oct to 1 Dec)
+        report_month = date.month - 2
+        if report_month < 1:
+            report_year = date.year - 1
+            report_month = 12 - report_month
+            last_day = monthrange(report_year, report_month)[-1]
+            report_date = date.replace(year=report_year, month=report_month, day=last_day)
+        else:
+            last_day = monthrange(date.year, report_month)[-1]
+            report_date = date.replace(month=report_month, day=last_day)
 
         # Initialize data columns
         for data in datas:
             result[data] = np.nan
 
-        # Loop through stocks
-        for index, row in result.iterrows():
-            stock = Stock.objects.get(ticker=row['Ticker'])
+        # Loop through data points
+        for data in datas:
+            # Get reports
+            if data in financials_data:
+                reports = FinancialReport.objects.filter(stock__in=stocks, date=report_date)
+            elif data in balance_sheet_data:
+                reports = BalanceSheet.objects.filter(stock__in=stocks, date=report_date)
+            elif data in cash_flow_data:
+                reports = CashFlow.objects.filter(stock__in=stocks, date=report_date)
+            else:
+                continue
 
-            # Loop through methods
-            for data in datas:
-                # Data name aligns with the database
-                data_db = data.replace(' ', '').strip()
-
-                if data in financials_data:
-                    report = FinancialReport.objects.filter(stock=stock, date=report_date)
-                    if not report: continue
-                elif data in balance_sheet_data:
-                    report = BalanceSheet.objects.filter(stock=stock, date=report_date)
-                    if not report: continue
-                elif data in cash_flow_data:
-                    report = CashFlow.objects.filter(stock=stock, date=report_date)
-                    if not report: continue
-                else:
-                    continue
-
-                # Set data
-                value = getattr(report.first(), data_db)
-                if value:
-                    result.loc[index, data] = float(value)
-                else:
-                    result.loc[index, data] = np.nan
+            # Set data
+            for report in reports:
+                value = getattr(report, data)
+                value = float(value) if value else value
+                result.loc[result['Ticker'] == report.stock.ticker, data] = value
 
         # Calculate result
         result_col_name = f'result-{dt.date.strftime(date, "%b %y")}'

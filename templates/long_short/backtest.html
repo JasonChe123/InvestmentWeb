@@ -211,6 +211,20 @@
                                 </select>
                             </div>
 
+                            <!-- Re-balancing months -->
+                            <div class="form-group col-md-2 my-1">
+                                <label for="re_balancing_months">Re-balancing Months</label>
+                                <select id="re_balancing_months" name="re_balancing_months" class="form-control">
+                                    {% for m in re_balancing_months %}
+                                    {% if m == selected_re_balancing_months %}
+                                    <option selected>{{ m }}</option>
+                                    {% else %}
+                                    <option>{{ m }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+
                             <!-- Ranking methods -->
                             <div class="form-group col-md-2 my-1">
                                 <label for="ranking_method">Ranking Method</label>
@@ -244,16 +258,16 @@
         <div {% if messages %}class="d-none" {% else %}class="d-block" {% endif %}>
             <!-- Title -->
             <h4 class="my-3">
-                Backtest Result for Top {{ selected_pos_hold }} and
-                Bottom {{ selected_pos_hold }} ranked by:<br>
-                {{ selected_method }}
+                Backtest Result for Top {{ selected_pos_hold }} and Bottom {{ selected_pos_hold }} Stocks<br>
+                Sector: {{ selected_sectors }}<br>
+                Ranked by: {{ selected_method }}
             </h4>
             <p>(The unit of ranking result is either billion, million or thousand if the value > 1,000)</p>
             <!-- Top Stocks -->
             <div class="row">
                 <p>
                     Top {{ selected_pos_hold }} Stocks (Total Performance
-                    <b {% if long_total < 0 %} style="color: red" {% endif %}> {{ long_total }}%</b>
+                    <b {% if long_total < 0 %}style="color: red"{% endif %}>{{long_total}}%</b>
                     )
                 </p>
                 <table class="table table-sm table-striped">
@@ -279,7 +293,7 @@
             <div class="row">
                 <p>
                     Bottom {{ selected_pos_hold }} Stocks (Total Performance
-                    <b {% if short_total < 0 %} style="color: red" {% endif %}>{{ short_total }}%</b>
+                    <b {% if short_total < 0 %}style="color: red"{% endif %}>{{short_total}}%</b>
                     )
                 </p>
                 <table class="table table-sm table-striped">

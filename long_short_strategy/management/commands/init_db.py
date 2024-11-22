@@ -84,7 +84,7 @@ def get_stock_list() -> pd.DataFrame:
 
     # Filter out all stocks with '^' in symbol
     df = pd.read_csv(csv_file)
-    df = df[~df['Symbol'].str.contains(r'^')].reset_index(drop=True)
+    df = df[~df['Symbol'].str.contains(r'\^')].reset_index(drop=True)
 
     return df
 

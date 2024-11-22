@@ -10,8 +10,6 @@ import logging
 import numpy as np
 import pandas as pd
 import re
-import time
-import tqdm
 from typing import Tuple
 from .models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
 
@@ -69,6 +67,7 @@ class BackTestView(View):
             'sectors': self.sectors,
             'backtest_years': self.backtest_years,
             'pos_hold': self.pos_hold,
+            're_balancing_months': self.re_balancing_months
         }
 
     def get(self, request):
@@ -89,6 +88,7 @@ class BackTestView(View):
         sector = request.POST.get('sectors')
         backtest_years = float(request.POST.get('backtest_years'))
         pos_hold = int(request.POST.get('pos_hold'))
+        re_balancing_months = request.POST.get('re_balancing_months')
         ranking_method = request.POST.get('ranking_method')
 
         # Add to context
@@ -98,6 +98,7 @@ class BackTestView(View):
         self.html_context['selected_sectors'] = sector
         self.html_context['selected_backtest_years'] = backtest_years
         self.html_context['selected_pos_hold'] = pos_hold
+        self.html_context['selected_re_balancing_months'] = re_balancing_months
         self.html_context['selected_ranking_method'] = ranking_method
 
         # Check input validity
@@ -118,7 +119,7 @@ class BackTestView(View):
             return render(request, 'long_short/backtest.html', self.html_context)
 
         # Get re-balancing dates
-        l_re_balancing_dates = get_re_balancing_dates(self.re_balancing_months[1], backtest_years)
+        l_re_balancing_dates = get_re_balancing_dates(re_balancing_months, backtest_years)
 
         # Get result by method chose
         results = get_result_from_method(
@@ -147,9 +148,9 @@ class BackTestView(View):
             df.rename(columns={'Performance': 'Perf(%)'}, inplace=True)
             df.replace(np.nan, "", inplace=True)
 
-        # Round to 2 decimals
-        df_top = df_top.map(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
-        df_bottom = df_bottom.map(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
+        # Round to 3 decimals
+        df_top = df_top.map(lambda x: round(x, 3) if isinstance(x, (int, float)) else x)
+        df_bottom = df_bottom.map(lambda x: round(x, 3) if isinstance(x, (int, float)) else x)
 
         # Rename column names from 'result-%b %y' to '%m/%y-%m/%y'
         rename_cols = {}
@@ -306,7 +307,7 @@ def get_result_from_method(formula: str,
         report_month = date.month - 2
         if report_month < 1:
             report_year = date.year - 1
-            report_month = 12 - report_month
+            report_month = 12 + report_month
             last_day = monthrange(report_year, report_month)[-1]
             report_date = date.replace(year=report_year, month=report_month, day=last_day)
         else:
@@ -332,12 +333,13 @@ def get_result_from_method(formula: str,
             # Set data
             for report in reports:
                 value = getattr(report, data)
-                value = float(value) if value else value
+                value = float(value) if value else np.nan
                 result.loc[result['Ticker'] == report.stock.ticker, data] = value
 
         # Calculate result
         result_col_name = f'result-{dt.date.strftime(date, "%b %y")}'
         result = apply_formula(result, formula, result_col_name)
+        result = result.replace([np.inf, -np.inf], np.nan)
 
         # Delete data columns
         result.drop(columns=datas, inplace=True)
@@ -432,7 +434,13 @@ def get_performance(result_subset: dict, method: str, pos_hold: int) -> Tuple[pd
             # Calculate performance
             price_from = float(candlesticks.first().open)
             price_to = float(candlesticks.last().adj_close)
-            df.at[i, 'Performance'] = (price_to / price_from - 1) * 100
+            if price_from < 10:
+                # Avoid stocks with too low price, too risky
+                logging.warning(f"Ticker: {row['Ticker']}: Price is too low: ({price_from}) "
+                                f"on {candlesticks.first().date.strftime('%Y-%m-%d')}, skip it.")
+                df.at[i, 'Performance'] = np.nan
+            else:
+                df.at[i, 'Performance'] = (price_to / price_from - 1) * 100
 
         # Add result to subset
         result_subset[from_month] = df
@@ -483,3 +491,14 @@ def extract_date_suffix(date_str: str) -> dt.datetime | None:
     match = date_pattern.search(date_str)
 
     return dt.datetime.strptime(match.group(1), '%b %y') if match else None
+
+# Parameters:
+# - Market Cap:             Mega, Large, Small
+# - Methods:                DEBIT /Total Non Current Assets
+# - Min Ipo Years:          1
+# - Positions:              20
+# - Re-balancing Months:    Feb, May, Aug, Nov
+# - Ranking Method:         Descending
+
+# todo: find a way to rank
+# - Healthcare

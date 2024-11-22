@@ -1,8 +1,5 @@
-import calendar
 import datetime as dt
 from calendar import monthrange
-from re import search
-
 from django.contrib import messages
 from django.db.models import Q
 from django.http import JsonResponse
@@ -13,9 +10,8 @@ import logging
 import numpy as np
 import pandas as pd
 import re
-from typing import Type
+from typing import Tuple
 from .models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
-
 
 market_cap = {
     'Mega (>$200B)': 200_000_000_000,
@@ -36,10 +32,10 @@ class BackTestView(View):
     def __init__(self):
         super().__init__()
 
-        # Setup market cap
+        # Initialize parameter: market cap
         self.market_cap = market_cap
 
-        # Setup fundamental data
+        # # Initialize parameter: fundamental data
         self.financials_data = [separate_words(field.name) for field in FinancialReport._meta.get_fields() if
                                 field.concrete and field.name not in ('id', 'stock', 'date')]
         self.balance_sheet_data = [separate_words(field.name) for field in BalanceSheet._meta.get_fields() if
@@ -47,7 +43,7 @@ class BackTestView(View):
         self.cash_flow_data = [separate_words(field.name) for field in CashFlow._meta.get_fields() if
                                field.concrete and field.name not in ('id', 'stock', 'date')]
 
-        # Setup other parameters
+        # # Initialize other parameters
         self.ipo_years = [5, 4, 3, 2, 1]
         self.sectors = ['Basic Materials', 'Technology', 'Industrials', 'Health Care', 'Energy',
                         'Consumer Discretionary', 'Real Estate', 'Miscellaneous', 'Telecommunications',
@@ -120,7 +116,7 @@ class BackTestView(View):
             return render(request, 'long_short/backtest.html', self.html_context)
 
         # Get re-balancing dates
-        l_re_balancing_dates = get_re_balancing_dates(self.re_balancing_months[1], backtest_years)
+        l_re_balancing_dates = get_re_balancing_dates(self.re_balancing_months[2], backtest_years)
 
         # Get result by method chose
         results = get_result_from_method(
@@ -128,141 +124,52 @@ class BackTestView(View):
             self.financials_data, self.balance_sheet_data, self.cash_flow_data
         )
 
-        return render(request, 'long_short/backtest.html', self.html_context)
+        # Ranking and split results
+        result_subset = rank_and_split(results, ranking_method)
 
-        merged_results = df_us_stocks.copy()
-        if method in self.financials_data:
-            report_table = FinancialReport
-        elif method in self.balance_sheet_data:
-            report_table = BalanceSheet
-        elif method in self.cash_flow_data:
-            report_table = CashFlow
-        else:
-            messages.warning(request, "Unknown method.")
-        for date in l_re_balancing_dates:
-            # Add result columns to us_stocks dataframe
-            result = fetch_data_by_method(date, df_us_stocks.copy(), method, report_table)
-            result = result[['Ticker', result.columns[-1]]]
-            merged_results = pd.merge(merged_results, result, on='Ticker', how='left')
+        # Get performance for each re-balancing date
+        df_top, df_bottom = get_performance(result_subset, method, pos_hold)
+        if df_top.empty or df_bottom.empty:
+            messages.warning(request, "No financial data available, please adjust your filter.")
 
-        # Ranking and split dataframe by result columns
-        result_subset = {}
-        result_cols = [col for col in merged_results.columns if col.startswith(f'{method}-')]
-        for col in result_cols:
-            if ranking_method == 'Descending':
-                result_subset[col] = merged_results[['Ticker', col]].sort_values(by=col, ascending=False)
-            else:
-                result_subset[col] = merged_results[['Ticker', col]].sort_values(by=col, ascending=True)
-            # result_subset[col] = merged_results[['Ticker', col]].sort_values(by=col, ascending=False)
-            result_subset[col].dropna(inplace=True, subset=[col])
+        # Add average performance to the top stocks, and bottom stocks
+        get_average_performance(df_top)
+        get_average_performance(df_bottom)
 
-        # Get performance for every re-balancing date
-        from_months = list(result_subset.keys())
-        to_months = list(result_subset.keys())[1:] + [
-            f'{method}-{dt.date.strftime(dt.date.today(), "%b %y")}'
-        ]
-        for from_month, to_month in zip(from_months, to_months):
-            # Initialize performance column
-            df = result_subset[from_month]
-            df['Performance'] = np.nan
+        # Calculate total performance for long and short stocks
+        total_performance_long = df_top.iloc[-1].sum(skipna=True)
+        total_performance_short = df_bottom.iloc[-1].sum(skipna=True)
 
-            # Formatting for start_date and end_date: {method}-May 23 -> 2023-05-01
-            start_date = extract_date_suffix(from_month).replace(tzinfo=dt.timezone.utc)
-            end_date = extract_date_suffix(to_month).replace(tzinfo=dt.timezone.utc)
-            if start_date == end_date:
-                end_date = dt.datetime.today().replace(tzinfo=dt.timezone.utc)
+        # Format dataframe
+        for df in (df_top, df_bottom):
+            df.rename(columns={'Performance': 'Perf(%)'}, inplace=True)
+            df.replace(np.nan, "", inplace=True)
 
-            # Extract top and bottom stocks
-            half_rows_num = min(pos_hold, len(df) // 2)
-            df = pd.concat([df.head(half_rows_num), df.tail(half_rows_num)])
+        # Round to 2 decimals
+        df_top = df_top.applymap(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
+        df_bottom = df_bottom.applymap(lambda x: round(x, 2) if isinstance(x, (int, float)) else x)
 
-            # Get performance changed for symbols
-            for i, row in df.iterrows():
-                stock = Stock.objects.get(ticker=row['Ticker'])
-                candlesticks = CandleStick.objects.filter(stock=stock, date__gte=start_date, date__lt=end_date)
-
-                # Check if candlestick data exists
-                if not candlesticks:
-                    continue
-
-                # Check if candlestick data is too far away from re-balancing date
-                candlestick_start_date = candlesticks.first().date
-                candlestick_end_date = candlesticks.last().date
-                if candlestick_start_date > candlestick_start_date + dt.timedelta(days=30) or \
-                        candlestick_end_date < end_date - dt.timedelta(days=30):
-                    logging.warning(f"Candlestick data is too far away: {row['Ticker']}")
-                    continue
-
-                # Calculate performance
-                from_price = float(candlesticks.first().open)
-                to_price = float(candlesticks.last().close)
-                df.at[i, 'Performance'] = round((to_price / from_price - 1) * 100, 2)
-
-            # Rename column and add result to subset
-            period_str = f'{from_month.replace(method + "-", "")} to {to_month.replace(method + "-", "")}'
-            df.rename(columns={from_month: period_str, }, inplace=True)
-            result_subset[from_month] = df
-
-        # Combine results
-        df_top = pd.DataFrame()
-        df_bottom = pd.DataFrame()
-        for key, df in result_subset.items():
-            df.dropna(inplace=True)
-            half_rows_num = min(pos_hold, len(df) // 2)
-
-            # Add top stocks
-            new_top = df.head(half_rows_num)
-            new_top.reset_index(inplace=True, drop=True)
-            df_top.reset_index(inplace=True, drop=True)
-            df_top = pd.concat([df_top, new_top], axis=1)
-
-            # Add bottom stocks
-            new_bottom = df.tail(half_rows_num)
-            new_bottom.reset_index(inplace=True, drop=True)
-            df_bottom.reset_index(inplace=True, drop=True)
-            df_bottom = pd.concat([df_bottom, new_bottom], axis=1)
-        if df_top.empty and df_bottom.empty:
-            messages.warning(request, 'No financial data available, please adjust your filter.')
-
-        # It will add mean performance: set it individually because it has same column name 'Performance' for multiple columns
-        long_total_performance = round(add_mean_row(df_top), 2)
-        short_total_performance = round(add_mean_row(df_bottom), 2)
+        # Rename column names from 'result-%b %y' to '%m/%y-%m/%y'
+        rename_cols = {}
+        for col in df_top.columns:
+            if 'result-' in col:
+                from_date = extract_date_suffix(col)
+                to_month = from_date.month + 2
+                if to_month > 12:
+                    to_date = from_date.replace(year=from_date.year + 1, month=to_month - 12)
+                else:
+                    to_date = from_date.replace(month=to_month)
+                rename_cols[col] = f'{from_date.strftime("%m/%y")}-{to_date.strftime("%m/%y")}'
+        df_top.rename(columns=rename_cols, inplace=True)
+        df_bottom.rename(columns=rename_cols, inplace=True)
 
         # Set html context
-        df_top.rename(columns={'Performance': 'Perf(%)'}, inplace=True)
-        df_bottom.rename(columns={'Performance': 'Perf(%)'}, inplace=True)
-        df_top.replace(np.nan, "", inplace=True)
-        df_bottom.replace(np.nan, "", inplace=True)
-
         self.html_context['df_top'] = df_top
         self.html_context['df_bottom'] = df_bottom
-        self.html_context['long_total'] = long_total_performance
-        self.html_context['short_total'] = short_total_performance
+        self.html_context['long_total'] = round(total_performance_long, 2)
+        self.html_context['short_total'] = round(total_performance_short, 2)
 
         return render(request, 'long_short/backtest.html', self.html_context)
-
-
-def search_method(request):
-    """
-    Search the method in Income Statement, Balance Sheet and Cash Flow, and return to the front-end.
-    :param request: Request
-    :return: {result: [method1, method2, ...]}
-    """
-    if request.method == 'POST':
-        search_str = json.loads(request.body).get('search_text')
-        if search_str.strip() == '':
-            return JsonResponse({'result': []})
-
-        fields_financials = [separate_words(field.name) for field in FinancialReport._meta.get_fields() if
-                             field.concrete and field.name not in ('id', 'stock', 'date')]
-        fields_balancesheet = [separate_words(field.name) for field in BalanceSheet._meta.get_fields() if
-                               field.concrete and field.name not in ('id', 'stock', 'date')]
-        fields_cashflow = [separate_words(field.name) for field in CashFlow._meta.get_fields() if
-                           field.concrete and field.name not in ('id', 'stock', 'date')]
-        all_fields = fields_financials + fields_balancesheet + fields_cashflow
-        results = [method for method in all_fields if search_str.lower() in method.lower()]
-
-        return JsonResponse({'result': results})
 
 
 def separate_words(string: str) -> str:
@@ -273,6 +180,9 @@ def separate_words(string: str) -> str:
 
 
 def get_us_stocks(selected_market_cap: list, min_ipo_years: int, sectors: list) -> pd.DataFrame:
+    """
+    Return us stocks based on selected market cap, min ipo years, and sectors.
+    """
     market_cap_str = list(market_cap.keys())
     market_cap_value = list(market_cap.values())
 
@@ -360,9 +270,8 @@ def get_result_from_method(formula: str,
 
     # Loop through re-balancing dates
     for date in re_balancing_dates:
-        # Get report date (1 month earlier than the re-balancing date)
-        report_date = (date - dt.timedelta(days=32))
-        report_date = report_date.replace(day=monthrange(report_date.year, report_date.month)[-1])
+        # Get report date (1 month before the re-balancing date)
+        report_date = date.replace(month=date.month - 2, day=monthrange(date.year, date.month - 2)[-1])
 
         # Initialize data columns
         for data in datas:
@@ -397,13 +306,13 @@ def get_result_from_method(formula: str,
                     result.loc[index, data] = np.nan
 
         # Calculate result
-        result_col_name = f'result-{dt.date.strftime(report_date, "%b %y")}'
+        result_col_name = f'result-{dt.date.strftime(date, "%b %y")}'
         result = apply_formula(result, formula, result_col_name)
 
         # Delete data columns
         result.drop(columns=datas, inplace=True)
 
-    return result  # todo: to be continue...
+    return result
 
 
 def apply_formula(df: pd.DataFrame, formula: str, result_col_name: str) -> pd.DataFrame:
@@ -417,106 +326,130 @@ def apply_formula(df: pd.DataFrame, formula: str, result_col_name: str) -> pd.Da
     return df
 
 
-def fetch_data_by_method(date: dt.date, us_stocks: pd.DataFrame, method: str,
-                         report_table: Type[FinancialReport | BalanceSheet | CashFlow]) -> pd.DataFrame:
-    # Initialize result in column
-    col_name = f'{method}-{dt.datetime.strftime(date, "%b %y")}'
-    us_stocks[col_name] = np.nan
+def search_method(request):
+    """
+    Search the method in Income Statement, Balance Sheet and Cash Flow, and return to the front-end.
+    :param request: Request
+    :return: {result: [method1, method2, ...]}
+    """
+    if request.method == 'POST':
+        search_str = json.loads(request.body).get('search_text')
+        if search_str.strip() == '':
+            return JsonResponse({'result': []})
 
-    # Get report date. E.g. if date is 2021-02-01, then the report date is 2020-12-31 (2 months earlier)
-    if date.month - 2 < 1:
-        request_report_date = date.replace(year=date.year - 1, month=12 + (date.month - 2))
-    else:
-        request_report_date = date.replace(month=date.month - 2)
+        fields_financials = [separate_words(field.name) for field in FinancialReport._meta.get_fields() if
+                             field.concrete and field.name not in ('id', 'stock', 'date')]
+        fields_balancesheet = [separate_words(field.name) for field in BalanceSheet._meta.get_fields() if
+                               field.concrete and field.name not in ('id', 'stock', 'date')]
+        fields_cashflow = [separate_words(field.name) for field in CashFlow._meta.get_fields() if
+                           field.concrete and field.name not in ('id', 'stock', 'date')]
+        all_fields = fields_financials + fields_balancesheet + fields_cashflow
+        results = [method for method in all_fields if search_str.lower() in method.lower()]
 
-    # Set last day of month
-    last_day = calendar.monthrange(request_report_date.year, request_report_date.month)[1]
-    request_report_date = request_report_date.replace(day=last_day)
-
-    # Get data for all stocks
-    for ticker in us_stocks['Ticker']:
-        # Get stock
-        stock = Stock.objects.get(ticker=ticker)
-        if not stock:
-            continue
-
-        # Get reoprt
-        report = report_table.objects.filter(stock=stock, date=request_report_date)
-        if not report:
-            continue
-        if len(report) > 1:
-            logging.warning(f"Multiple reports for {ticker} on {request_report_date}! Please check.")
-            continue
-        report = report[0]
-
-        # Get data by method
-        if not getattr(report, method.replace(' ', '')):
-            continue
-
-        # Update value
-        value = float(getattr(report, method.replace(' ', '')))
-        if method not in ('Basic EPS', 'Diluted EPS'):
-            value /= 1_000_000
-        us_stocks.loc[us_stocks['Ticker'] == ticker, col_name] = round(value, 2)
-
-    # Filter out zero and NaN
-    us_stocks = us_stocks[
-        (us_stocks[col_name] != 0) &
-        (us_stocks[col_name].notna())
-        ]
-
-    return us_stocks
+        return JsonResponse({'result': results})
 
 
-def fetch_percent_changed(df: pd.DataFrame, start_date: str, end_date: str) -> float | None:
-    try:
-        first_open = df.loc[start_date]['Open'].iloc[0]
-        last_close = df.loc[end_date]['Adj Close'].iloc[-1]
-    except KeyError:
-        # Not enough data for start date, probably not listed yet
-        return 0
+def rank_and_split(results: pd.DataFrame, ranking_method: str) -> dict:
+    result_subset = {}
+    result_cols = [col for col in results.columns if col.startswith('result')]
+    ascending = True if ranking_method == 'Ascending' else False
+    for col in result_cols:
+        result = results[['Ticker', col]]
+        result_subset[col] = result.sort_values(by=col, ascending=ascending)
+        result_subset[col].dropna(inplace=True, subset=[col])
 
-    return round((last_close / first_open - 1) * 100, 2)
+    return result_subset
+
+
+def get_performance(result_subset: dict, method: str, pos_hold: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    # Setup from_month
+    this_month = f"result-{dt.date.strftime(dt.date.today(), '%b %y')}"
+    l_from_months = list(result_subset.keys())
+    l_to_months = l_from_months[1:] + [this_month]
+
+    # Loop through all periods
+    for from_month, to_month in zip(l_from_months, l_to_months):
+        # Initialize dataframe
+        df = result_subset[from_month]
+        df['Performance'] = np.nan
+
+        # Format start_date and end_date: result-May 23 -> 2023-05-01
+        start_date = extract_date_suffix(from_month).replace(tzinfo=dt.timezone.utc)
+        end_date = extract_date_suffix(to_month).replace(tzinfo=dt.timezone.utc)
+        # In case of today == from_month
+        if start_date == end_date:
+            end_date = dt.datetime.today().replace(tzinfo=dt.timezone.utc)
+
+        # Extract top and bottom stocks
+        half_rows_num = min(pos_hold, len(df) // 2)
+        df = pd.concat([df.head(half_rows_num), df.tail(half_rows_num)])
+
+        # Get performance change for each symbol
+        for i, row in df.iterrows():
+            stock = Stock.objects.get(ticker=row['Ticker'])
+            candlesticks = CandleStick.objects.filter(stock=stock, date__gte=start_date, date__lte=end_date)
+            if not candlesticks:
+                continue
+
+            # Candlestick data may too far away from re-balancing date
+            candlestick_start_date = candlesticks.first().date
+            candlestick_end_date = candlesticks.last().date
+            if candlestick_start_date > start_date + dt.timedelta(days=30) or \
+                    candlestick_end_date < end_date - dt.timedelta(days=30):
+                logging.warning(f"[ {row['Ticker']} ] Candlestick data is too far away.")
+                continue
+
+            # Calculate performance
+            price_from = float(candlesticks.first().open)
+            price_to = float(candlesticks.last().adj_close)
+            df.at[i, 'Performance'] = (price_to / price_from - 1) * 100
+
+        # Add result to subset
+        result_subset[from_month] = df
+
+    # Combine results
+    df_top = pd.DataFrame()
+    df_bottom = pd.DataFrame()
+    for key, result in result_subset.items():
+        result.dropna(inplace=True)
+        half_rows_num = min(pos_hold, len(result) // 2)
+
+        # Add top stocks
+        df_top_new = result.head(half_rows_num)
+        df_top_new.reset_index(inplace=True, drop=True)
+        df_top.reset_index(inplace=True, drop=True)
+        df_top = pd.concat([df_top, df_top_new], axis=1)
+
+        # Add bottom stocks
+        df_bottom_new = result.tail(half_rows_num)
+        df_bottom_new.reset_index(inplace=True, drop=True)
+        df_bottom.reset_index(inplace=True, drop=True)
+        df_bottom = pd.concat([df_bottom, df_bottom_new], axis=1)
+
+    return df_top, df_bottom
+
+
+def get_average_performance(df: pd.DataFrame):
+    # Save original columns first, then deal with duplicate columns
+    original_cols = df.columns.copy()
+
+    # Rename all columns
+    df.columns = [f'col_{i}' for i in range(len(df.columns))]
+
+    # Add mean row
+    mean_row = df.select_dtypes(include=[np.number]).mean()
+    df.loc['Average'] = mean_row
+
+    # Restore original columns
+    df.columns = original_cols
+
+    # Remove values in the mean row except all performance columns
+    non_performance_cols = [col for col in df.columns if col != 'Performance' and col != 'Ticker']
+    df.loc['Average', non_performance_cols] = np.nan
 
 
 def extract_date_suffix(date_str: str) -> dt.datetime | None:
     date_pattern = re.compile(r'-(\w+ \d{2})$')
     match = date_pattern.search(date_str)
+
     return dt.datetime.strptime(match.group(1), '%b %y') if match else None
-    # return pd.to_datetime(match.group(1), format='%b %y') if match else None
-
-
-def reorder_dataframe_columns(df: pd.DataFrame, method: str) -> pd.DataFrame:
-    """
-    Reorder dataframe columns by date.
-    :param df: Target dataframe.
-    :param method: Method name to identify the target columns.
-    :return: None
-    """
-    # Identify columns
-    cols = [col for col in df.columns if col.startswith(f'{method}-')]
-
-    # Sort columns
-    cols.sort(key=extract_date_suffix)
-    other_cols = [col for col in df.columns if col not in cols]
-    df = df.reindex(columns=other_cols + cols)
-    df.sort_values(by='Ticker', inplace=True)
-    df.reset_index(inplace=True, drop=True)
-
-    return df
-
-
-def add_mean_row(df: pd.DataFrame) -> float:
-    mean_performance = df['Performance'].mean().tolist()
-    df.reset_index(inplace=True, drop=True)
-    df.loc[len(df)] = ''
-    total = 0
-    for i, col in enumerate(df.columns):
-        if col == 'Performance':
-            mean = round(mean_performance.pop(0), 2)
-            if np.isnan(mean):
-                mean = 0
-            df.iat[df.index[-1], i] = mean
-            total += mean
-
-    return total

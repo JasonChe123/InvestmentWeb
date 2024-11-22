@@ -29,7 +29,7 @@
                 <!-- Parameters -->
                 <div class="row">
                     <!-- Market Cap -->
-                    <div class="col-md-3">
+                    <div class="col-md-3 my-1">
                         <label>Market Cap</label>
                         <div class="card">
                             <div class="card-body ">
@@ -45,13 +45,13 @@
                     </div>
 
                     <!-- Methods -->
-                    <div class="col-md-9">
+                    <div class="col-md-9 my-1">
                         <label>Methods</label>
                         <!-- Methods -->
                         <div class="card">
                             <div class="card-body">
                                 <!-- search bar -->
-                                <div class="row">
+                                <div class="row p-2">
                                     <div class="col-md-12">
                                         <!-- search bar -->
                                         <div class="form-group mb-0">
@@ -63,9 +63,9 @@
                                 </div>
 
                                 <!-- other fields -->
-                                <div class="row mt-3">
+                                <div class="row p-2">
                                     <!-- Financial -->
-                                    <div class="form-group col-md-3">
+                                    <div class="form-group col-md-3 my-1">
                                         <label for="methods_financial">Income Statement</label>
                                         <select id="methods_financial" name='methods_financial'
                                                 class="form-control method-selector">
@@ -80,7 +80,7 @@
                                     </div>
 
                                     <!-- Balance Sheet -->
-                                    <div class="form-group col-md-3">
+                                    <div class="form-group col-md-3 my-1">
                                         <label for="methods_balance_sheet">Balance Sheet</label>
                                         <select id="methods_balance_sheet" name='methods_balance_sheet'
                                                 class="form-control method-selector">
@@ -95,7 +95,7 @@
                                     </div>
 
                                     <!-- Cash Flow -->
-                                    <div class="form-group col-md-3">
+                                    <div class="form-group col-md-3 my-1">
                                         <label for="methods_cash_flow">Cash Flow</label>
                                         <select id="methods_cash_flow" name='methods_cash_flow'
                                                 class="form-control method-selector">
@@ -110,7 +110,7 @@
                                     </div>
 
                                     <!-- Operator buttons -->
-                                    <div class="col-md-3 my-auto">
+                                    <div class="col-md-3">
                                         <div class="row">
                                             <button type="button" class="btn btn-outline-primary operator me-1"
                                                     style="width: 40px;" value="+">+
@@ -153,10 +153,10 @@
                     </div>
 
                     <!-- Other params -->
-                    <div class="col-md-12">
+                    <div class="col-md-12 my-1">
                         <div class="row my-3">
                             <!-- Ipo years -->
-                            <div class="form-group col-md-2">
+                            <div class="form-group col-md-2 my-1">
                                 <label for="ipo_years">Min IPO Years</label>
                                 <select id="ipo_years" name='ipo_years' class="form-control">
                                     {% for y in ipo_years %}
@@ -170,7 +170,7 @@
                             </div>
 
                             <!-- Sectors -->
-                            <div class="form-group col-md-2">
+                            <div class="form-group col-md-2 my-1">
                                 <label for="sectors">Sector</label>
                                 <select id="sectors" name="sectors" class="form-control">
                                     {% for s in sectors %}
@@ -184,7 +184,7 @@
                             </div>
 
                             <!-- Backtest years -->
-                            <div class="form-group col-md-2">
+                            <div class="form-group col-md-2 my-1">
                                 <label for="backtest_years">Backtest Years</label>
                                 <select id="backtest_years" name="backtest_years" class="form-control">
                                     {% for y in backtest_years %}
@@ -198,7 +198,7 @@
                             </div>
 
                             <!-- Positions hold -->
-                            <div class="form-group col-md-2">
+                            <div class="form-group col-md-2 my-1">
                                 <label for="pos_hold">Position</label>
                                 <select id="pos_hold" name="pos_hold" class="form-control">
                                     {% for p in pos_hold %}
@@ -212,7 +212,7 @@
                             </div>
 
                             <!-- Ranking methods -->
-                            <div class="form-group col-md-2">
+                            <div class="form-group col-md-2 my-1">
                                 <label for="ranking_method">Ranking Method</label>
                                 <select id="ranking_method" name="ranking_method" class="form-control">
                                     {% if selected_ranking_method == 'Descending' %}
@@ -229,7 +229,7 @@
                 </div>
 
                 <!-- Submit button -->
-                <div class="col-md-1 mt-3">
+                <div class="col-md-1">
                     <button type="submit" class="btn btn-primary col-md-12">Start</button>
                 </div>
             </form>

@@ -1,19 +1,27 @@
 document.addEventListener('DOMContentLoaded', function () {
+    const csrf_token = document.querySelector("#csrf_token").value;
+    const amountInput = document.querySelector("#amount");
+    const fileInput = document.querySelector("#formFile");
+    const exportButton = document.querySelector("#export_button");
+    const closeButton = document.querySelector("#close_button");
+    const messageModal = new bootstrap.Modal(document.getElementById('messageModal'));
+    const messageModalBody = document.getElementById('messageModalBody');
+
     // Add selected method
     function addSelectedMethod(method) {
         const selected_method = document.getElementById("selected_method");
         const selected_method_input = document.getElementById("selected_method_input");
 
         // If the last string is +, -, *, /, (
-        if (/[\+\-\*\/(]$/.test(selected_method.innerText)) {
+        if (/[+\-*\/(]$/.test(selected_method.innerText)) {
             // Add the selected method
             selected_method.innerText += " " + method;
             selected_method_input.value += " " + method;
         }
         // If the string includes +, -, *, /
-        else if (/[\+\-\*\/]/.test(selected_method.innerText)) {
+        else if (/[+\-*\/]/.test(selected_method.innerText)) {
             // If +, -, *, / and followed by not(+, -, *, /)
-            const lastOperatorIndex = selected_method.innerText.search(/[\+\-\*\/][^+\-*/]*$/);
+            const lastOperatorIndex = selected_method.innerText.search(/[+\-*\/][^+\-*/]*$/);
             if (lastOperatorIndex !== -1) {
                 // Replace the last method string
                 const newString = selected_method.innerText.slice(0, lastOperatorIndex + 2) + method;
@@ -70,16 +78,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Toggle show/ hide text in collapse button
-    var collapse_params_button = document.getElementById('collapse_params_button');
-    var backtest_params_area = document.getElementById('backtest_params_area');
-    backtest_params_area.addEventListener('show.bs.collapse', function () {
-        collapse_params_button.innerText = "Hide";
-    });
-    backtest_params_area.addEventListener('hidden.bs.collapse', function () {
-        collapse_params_button.innerText = "Show";
-    });
-
     // Methods search bar
     const search_field = document.querySelector("#search-field");
     const search_result = document.querySelector("#search-result");
@@ -91,6 +89,7 @@ document.addEventListener('DOMContentLoaded', function () {
             headers: {
                 "X-requested-with": "XMLHttpRequest",
                 "Content-Type": "application/json",
+                'X-CSRFToken': csrf_token,
             },
             body: JSON.stringify({"search_text": search_value})
         })
@@ -203,4 +202,114 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    // Auto hide 'Backtest Parameters'
+    const long_total = document.getElementById("long_total");
+    if (!long_total) {
+        document.getElementById("collapse_params_button").click();
+    }
+
+    // Validate amount from basket trader
+    amountInput.addEventListener("keyup", function (event) {
+        const value = event.target.value;
+        if (value === "" || Number(value) === 0) {
+            this.classList.add("is-invalid");
+            exportButton.disabled = true;
+        } else {
+            this.classList.remove("is-invalid");
+            validateExportButton();
+        }
+    });
+
+    // Validate file format from basket trader
+    fileInput.addEventListener("change", function (event) {
+        const value = event.target.value;
+        if (!value.endsWith(".csv")) {
+            this.classList.add("is-invalid");
+            exportButton.disabled = true;
+        } else {
+            this.classList.remove("is-invalid");
+            validateExportButton();
+        }
+    });
+
+    // Validate the export button
+    function validateExportButton() {
+        exportButton.disabled =
+            amountInput.classList.contains("is-invalid") ||
+            fileInput.classList.contains("is-invalid") ||
+            amountInput.value === "" ||
+            fileInput.value === "";
+    }
+
+    // Export button event
+    exportButton.addEventListener('click', function () {
+        // Extract table data
+        const table_top_data = extractTableData(document.querySelector("#table_top"));
+        const table_bottom_data = extractTableData(document.querySelector("#table_bottom"));
+
+        // Add data to formData
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0])
+        formData.append("table_data", JSON.stringify({
+            table_top: table_top_data,
+            table_bottom: table_bottom_data,
+        }));
+        formData.append("amount", amountInput.value);
+
+        // Send request
+        fetch("export-csv", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrf_token,
+            },
+            body: formData
+        })
+            .then(response => {
+                // Close the basket trader modal
+                closeButton.click();
+
+                // Check the response
+                if (!response.ok) {
+                    console.log(`HTTP error! status: ${response.status}`);
+                    messageModalBody.textContent = "Something went wrong! Please try again.";
+                    messageModal.show();
+                } else if (!response.headers.get('Content-Type').includes('text/csv')) {
+                    console.log(`The response is not a CSV file.`);
+                    messageModalBody.textContent = "Something went wrong! Please try again.";
+                    messageModal.show();
+                } else {
+                    return response.blob();
+                }
+            })
+            .then(blob => {
+                // Show important information
+                messageModalBody.textContent = "Please carefully read the downloaded basket trader file, it may close all your positions which is not relevant to this strategy. You can edit the file if necessary.";
+                messageModal.show();
+
+                // Download the file
+                document.getElementById('messageModal').addEventListener('hidden.bs.modal', function () {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'basket_trader.csv';
+                    a.click();
+                });
+            });
+    })
 });
+
+
+function extractTableData(table) {
+    const rows = table.rows;
+    const data = [];
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowData = [];
+        for (let j = 0; j < row.cells.length; j++) {
+            rowData.push(row.cells[j].textContent);
+        }
+        data.push(rowData);
+    }
+    return data;
+}

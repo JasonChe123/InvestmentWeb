@@ -1,9 +1,12 @@
-import datetime as dt
+import csv
 from calendar import monthrange
+import datetime as dt
 from django.contrib import messages
+from django.http import HttpResponse
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.template.context_processors import csrf
 from django.views import View
 import json
 import logging
@@ -11,6 +14,10 @@ import numpy as np
 import pandas as pd
 import re
 from typing import Tuple
+
+from pandas.core.interchange.dataframe_protocol import DataFrame
+from pandas.plotting import table
+
 from .models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
 
 market_cap = {
@@ -72,11 +79,13 @@ class BackTestView(View):
 
     def get(self, request):
         # Default parameters
-        self.html_context['selected_market_cap'] = list(self.market_cap.keys())[:3]
+        self.html_context['selected_market_cap'] = list(self.market_cap.keys())[:-1]
         self.html_context['selected_ipo_years'] = 1
         self.html_context['selected_backtest_years'] = 1.5
-        self.html_context['selected_pos_hold'] = 30
+        self.html_context['selected_pos_hold'] = 20
+        self.html_context['selected_re_balancing_months'] = self.re_balancing_months[1]
         self.html_context['selected_ranking_method'] = 'Descending'
+        self.html_context['csrf_token'] = csrf(request)['csrf_token']
 
         return render(request, 'long_short/backtest.html', self.html_context)
 
@@ -166,7 +175,7 @@ class BackTestView(View):
         df_top.rename(columns=rename_cols, inplace=True)
         df_bottom.rename(columns=rename_cols, inplace=True)
 
-        # Change unit
+        # Change unit (billion/ million/ thousand)
         def divide_columns(df, divisor, column_contains):
             # Select columns that match the pattern
             cols = df.columns[df.columns.str.contains(column_contains)]
@@ -180,12 +189,13 @@ class BackTestView(View):
 
         if len(df_top) > 1:
             max_value = max(pd.to_numeric(df_top.loc[0], errors='coerce').dropna())
+            min_value = min(pd.to_numeric(df_bottom.loc[0], errors='coerce').dropna())
             for df in (df_top, df_bottom):
-                if max_value > 1_000_000_000:
+                if min_value < -1_000_000_000 or max_value > 1_000_000_000:
                     divide_columns(df, 1_000_000_000, '-')
-                elif max_value > 1_000_000:
+                elif min_value < -1_000_000 or max_value > 1_000_000:
                     divide_columns(df, 1_000_000, '-')
-                elif max_value > 1_000:
+                elif min_value < -1_000 or max_value > 1_000:
                     divide_columns(df, 1_000, '-')
 
         # Set html context
@@ -440,7 +450,7 @@ def get_performance(result_subset: dict, method: str, pos_hold: int) -> Tuple[pd
                                 f"on {candlesticks.first().date.strftime('%Y-%m-%d')}, skip it.")
                 df.at[i, 'Performance'] = np.nan
             else:
-                df.at[i, 'Performance'] = (price_to / price_from - 1) * 100
+                df.at[i, 'Performance'] = round((price_to / price_from - 1) * 100, 2)
 
         # Add result to subset
         result_subset[from_month] = df
@@ -476,7 +486,7 @@ def get_average_performance(df: pd.DataFrame):
 
     # Add mean row
     mean_row = df.select_dtypes(include=[np.number]).mean()
-    df.loc['Average'] = mean_row
+    df.loc['Average'] = round(mean_row, 2)
 
     # Restore original columns
     df.columns = original_cols
@@ -492,8 +502,105 @@ def extract_date_suffix(date_str: str) -> dt.datetime | None:
 
     return dt.datetime.strptime(match.group(1), '%b %y') if match else None
 
+
+def export_csv(request):
+    # Get existing portfolio
+    file = request.FILES['file']
+    try:
+        df_portfolio = pd.read_csv(file)
+        df_portfolio = df_portfolio[['Financial Instrument', 'Position']]
+        df_portfolio['Financial Instrument'] = df_portfolio['Financial Instrument'].str.split(' ').str[0]
+        df_portfolio['Position'] = df_portfolio['Position'].str.strip("'").astype(int)
+        df_portfolio.rename(columns={'Financial Instrument': 'Ticker', 'Position': 'Existing Position'}, inplace=True)
+    except Exception as e:
+        df_portfolio = pd.DataFrame(columns=['Ticker', 'Existing Position'])
+
+    # Get top and bottom stocks from backtest
+    data = json.loads(request.POST['table_data'])
+    df_top_stocks = pd.DataFrame(columns=data['table_top'][0], data=data['table_top'][1:])
+    df_bottom_stocks = pd.DataFrame(columns=data['table_bottom'][0], data=data['table_bottom'][1:])
+
+    # Ignore the last row (row for total) and extract the last 3 columns (the latest re-balancing period)
+    df_top_stocks = df_top_stocks.iloc[:-1, -3:]
+    df_bottom_stocks = df_bottom_stocks.iloc[:-1, -3:]
+
+    # Remove empty rows
+    df_top_stocks = df_top_stocks[df_top_stocks['Ticker'] != '']
+    df_bottom_stocks = df_bottom_stocks[df_bottom_stocks['Ticker'] != '']
+
+    # Assign amount for each stock
+    amount = abs(int(request.POST['amount']))
+    df_top_stocks['Amount(USD)'] = amount // 2 // len(df_top_stocks)
+    df_bottom_stocks['Amount(USD)'] = amount // 2 // len(df_bottom_stocks)
+
+    # Get previous adj_close for each stock
+    re_balancing_date_str = df_top_stocks.columns[1].split(' ')[0]
+    re_balancing_date = dt.datetime.strptime(re_balancing_date_str, '%m/%y').replace(tzinfo=dt.timezone.utc)
+    df_top_stocks['Previous Adj Close'] = df_top_stocks['Ticker'].map(
+        lambda ticker: get_previous_close(ticker, re_balancing_date)
+    )
+    df_bottom_stocks['Previous Adj Close'] = df_bottom_stocks['Ticker'].map(
+        lambda ticker: get_previous_close(ticker, re_balancing_date)
+    )
+
+    # Assign position for each stock
+    df_top_stocks['Expected Position'] = df_top_stocks['Amount(USD)'] // df_top_stocks['Previous Adj Close']
+    df_bottom_stocks['Expected Position'] = df_bottom_stocks['Amount(USD)'] // -df_bottom_stocks['Previous Adj Close']
+
+    # Calculate execute position
+    df_execute = pd.concat([df_top_stocks, df_bottom_stocks], ignore_index=True)
+    df_execute = pd.merge(df_execute, df_portfolio, on='Ticker', how='outer')
+
+    # df_execute = pd.merge(df_execute, df_portfolio, on='Ticker', how='left')
+    df_execute['Existing Position'] = df_execute['Existing Position'].fillna(0)
+    df_execute['Expected Position'] = df_execute['Expected Position'].fillna(0)
+    df_execute['Execute Position'] = df_execute['Expected Position'].astype(int) - df_execute['Existing Position']
+    df_execute = df_execute[['Ticker', 'Execute Position']]
+
+    # Create basket trader dataframe
+    basket_trader_cols = ['Action', 'Quantity', 'Symbol', 'SecType', 'Exchange', 'Currency', 'TimeInForce',
+                          'OrderType', 'BasketTag', 'Account', 'OrderRef', 'LmtPrice', 'UsePriceMgmtAlgo', 'OutsideRth']
+    basket_tag = 'LONG/SHORT'
+    df_basket_trader = pd.DataFrame(columns=basket_trader_cols)
+    df_basket_trader['Symbol'] = df_execute['Ticker']
+    df_basket_trader['Quantity'] = df_execute['Execute Position']
+    df_basket_trader['Action'] = np.where(df_basket_trader['Quantity'] >= 0, 'BUY', 'SELL')
+    df_basket_trader['SecType'] = 'STK'
+    df_basket_trader['Exchange'] = 'SMART/NASDAQ/NYSE/ARCA'
+    df_basket_trader['Currency'] = 'USD'
+    df_basket_trader['TimeInForce'] = 'OPG'
+    df_basket_trader['OrderType'] = 'MKT'
+    df_basket_trader['BasketTag'] = basket_tag
+    df_basket_trader['Account'] = ''
+    df_basket_trader['OrderRef'] = basket_tag
+    df_basket_trader['LmtPrice'] = 0
+    df_basket_trader['UsePriceMgmtAlgo'] = 'TRUE'
+    df_basket_trader['OutsideRth'] = 'FALSE'
+
+    # Write csv response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="basket_trader.csv"'
+    writer = csv.writer(response)
+    writer.writerow(basket_trader_cols)
+    for index, row in df_basket_trader.iterrows():
+        writer.writerow(row.tolist())
+
+    return response
+
+
+def get_previous_close(ticker: str, date: dt.datetime) -> float:
+    if not ticker:
+        return 0
+
+    stock = Stock.objects.get(ticker=ticker)
+    if not stock:
+        return 0
+
+    candlestick = CandleStick.objects.filter(stock=stock, date__lt=date)
+    return candlestick.last().adj_close
+
 # Parameters:
-# - Market Cap:             Mega, Large, Small
+# - Market Cap:             Mega, Large, Medium, Small, Micro
 # - Methods:                DEBIT /Total Non Current Assets
 # - Min Ipo Years:          1
 # - Positions:              20
@@ -501,4 +608,7 @@ def extract_date_suffix(date_str: str) -> dt.datetime | None:
 # - Ranking Method:         Descending
 
 # todo: find a way to rank
-# - Healthcare
+# - energy (Basic EPS)
+# - healthcare (Basic EPS)
+# - technology (Total Expenses / Total Assets)
+# - telecommunications

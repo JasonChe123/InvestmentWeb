@@ -1,19 +1,88 @@
-<!DOCTYPE html>
+<!doctype html>
 {% load static %}
-
 <html lang="en">
+<!-- Head -->
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Investment Web{% block title%}{% endblock title %}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Investment Web {% block title %}{% endblock title %}</title>
+    <link rel="icon" href="{% static 'images/favicons/favicon.png' %}" sizes="32x32" type="image/png">
     <link href="{% static 'css/bootstrap.min.css' %}" rel="stylesheet">
+    <link href="{% static 'css/sidebars.css' %}" rel="stylesheet">
 </head>
-<body class="m-3">
-<div class="container">
-    <h1>Investment Web</h1>
+<!-- Body -->
+<body>
+<main>
+    <!-- Sidebar -->
+    <div class="d-flex flex-column flex-shrink-0 p-3 text-white bg-light" style="width: 280px;">
+        <ul class="list-unstyled ps-0">
+            <!-- Home -->
+            <li class="mb-1">
+                <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse"
+                        data-bs-target="#home-collapse" aria-expanded="false">
+                    Home
+                </button>
+                <div class="collapse" id="home-collapse" style="">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                        <li><a href="#" class="link-dark rounded">Overview</a></li>
+                        <li><a href="#" class="link-dark rounded">Financial Weather</a></li>
+                        <li><a href="#" class="link-dark rounded">Virtual Portfolio</a></li>
+                    </ul>
+                </div>
+            </li>
+            <!-- Dashboard -->
+            <li class="mb-1">
+                <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse"
+                        data-bs-target="#dashboard-collapse" aria-expanded="false">
+                    Dashboard
+                </button>
+                <div class="collapse" id="dashboard-collapse">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                        <li><a href="#" class="link-dark rounded">Performance</a></li>
+                        <li><a href="#" class="link-dark rounded">Risk Report</a></li>
+                        <li><a href="#" class="link-dark rounded">Activity</a></li>
+                    </ul>
+                </div>
+            </li>
+            <!-- Strategies -->
+            <li class="mb-1">
+                <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse"
+                        data-bs-target="#orders-collapse" aria-expanded="false">
+                    Strategies Builder
+                </button>
+                <div class="collapse" id="orders-collapse">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                        <li><a href="#" class="link-dark rounded">Marco</a></li>
+                        <li><a href="{% url 'longshort-backtest' %}" class="link-dark rounded">LongShort</a></li>
+                        <li><a href="#" class="link-dark rounded">DayTrade</a></li>
+                        <li><a href="#" class="link-dark rounded">Equity Curve Trading</a></li>
+                    </ul>
+                </div>
+            </li>
+            <li class="border-top my-3"></li>
+            <li class="mb-1">
+                <button class="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse"
+                        data-bs-target="#account-collapse" aria-expanded="false">
+                    Account
+                </button>
+                <div class="collapse" id="account-collapse">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                        <li><a href="#" class="link-dark rounded">Profile</a></li>
+                        <li><a href="#" class="link-dark rounded">Settings</a></li>
+                        <li><a href="#" class="link-dark rounded">Sign out</a></li>
+                    </ul>
+                </div>
+            </li>
+        </ul>
+    </div>
+    <!-- Content -->
     {% block content %}
+    <div class="my-3 mx-3">
+        <h1>Welcome To Investment Web</h1>
+    </div>
     {% endblock content %}
-</div>
+</main>
+<!-- Script -->
 <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
 </body>
 </html>

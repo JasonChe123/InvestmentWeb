@@ -30,7 +30,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("Stock data 'DELETE' success!"))
 
     def querying_update_all_stock(self, df_stock_list: pd.DataFrame):
-        self.stdout.write(self.style.WARNING("'UPDATE' STOCK DATA?"))
+        self.stdout.write(self.style.WARNING("'UPDATE' STOCK LIST?"))
         while (ans := input('(y/n) ').strip().lower()) not in ('y', 'n'):
             print("Please enter 'y' or 'n")
         if ans.strip().lower() == 'y':

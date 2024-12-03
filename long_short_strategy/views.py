@@ -87,7 +87,7 @@ class BackTestView(View):
         self.html_context['selected_ranking_method'] = 'Descending'
         self.html_context['csrf_token'] = csrf(request)['csrf_token']
 
-        return render(request, 'long_short/backtest.html', self.html_context)
+        return render(request, 'long_short/index.html', self.html_context)
 
     def post(self, request):
         # Get user's parameters
@@ -113,19 +113,19 @@ class BackTestView(View):
         # Check input validity
         if not market_cap:
             messages.warning(request, 'Please select Market Cap.')
-            return render(request, 'long_short/backtest.html', self.html_context)
+            return render(request, 'long_short/index.html', self.html_context)
         if not method:
             messages.warning(request, 'Please select Method.')
-            return render(request, 'long_short/backtest.html', self.html_context)
+            return render(request, 'long_short/index.html', self.html_context)
         if method.count('(') != method.count(')'):
             messages.warning(request, 'Your method is not valid, please check.')
-            return render(request, 'long_short/backtest.html', self.html_context)
+            return render(request, 'long_short/index.html', self.html_context)
 
         # Get US stocks
         df_us_stocks = get_us_stocks(market_cap, ipo_years, [sector, ])
         if len(df_us_stocks) == 0:
             messages.warning(request, 'No stocks found, please adjust your filter.')
-            return render(request, 'long_short/backtest.html', self.html_context)
+            return render(request, 'long_short/index.html', self.html_context)
 
         # Get re-balancing dates
         l_re_balancing_dates = get_re_balancing_dates(re_balancing_months, backtest_years)
@@ -204,7 +204,7 @@ class BackTestView(View):
         self.html_context['long_total'] = round(total_performance_long, 2)
         self.html_context['short_total'] = round(total_performance_short, 2)
 
-        return render(request, 'long_short/backtest.html', self.html_context)
+        return render(request, 'long_short/index.html', self.html_context)
 
 
 def separate_words(string: str) -> str:

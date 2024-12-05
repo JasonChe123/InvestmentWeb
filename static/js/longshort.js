@@ -238,8 +238,7 @@ document.addEventListener('DOMContentLoaded', function () {
         exportButton.disabled =
             amountInput.classList.contains("is-invalid") ||
             fileInput.classList.contains("is-invalid") ||
-            amountInput.value === "" ||
-            fileInput.value === "";
+            amountInput.value === ""
     }
 
     // Export button event
@@ -284,7 +283,7 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .then(blob => {
                 // Show important information
-                messageModalBody.textContent = "Please carefully read the downloaded basket trader file, it may close all your positions which is not relevant to this strategy. You can edit the file if necessary.";
+                messageModalBody.textContent = "Please carefully read the downloaded basket trader file, it may close all your positions after submitted to IB-TWS, which is not relevant to this strategy. You can edit the file if necessary.";
                 messageModal.show();
 
                 // Download the file

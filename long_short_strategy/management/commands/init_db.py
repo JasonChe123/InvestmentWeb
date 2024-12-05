@@ -6,6 +6,7 @@ from long_short_strategy.models import Stock, FinancialReport, BalanceSheet, Cas
 import numpy as np
 import os
 import pandas as pd
+import time
 from tqdm import tqdm
 from typing import Tuple, Type
 import yfinance as yf
@@ -16,66 +17,71 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         df_stock_list = get_stock_list()
-        self.querying_delete_all_stock()
-        self.querying_update_all_stock(df_stock_list)
-        self.querying_update_all_candlestick(df_stock_list)
-        self.querying_update_financial_report(df_stock_list)
+        is_del_stocks = self.querying_delete_all_stock()
+        is_update_stocks = self.querying_update_stock_list(df_stock_list)
+        is_update_candlestick = self.querying_update_all_candlestick(df_stock_list)
+        is_update_reports = self.querying_update_financial_report(df_stock_list)
+        print()
+
+        if is_del_stocks:
+            delete_data_from_db_table(Stock)
+            self.stdout.write(self.style.SUCCESS("Stock data 'DELETE' success!"))
+        if is_update_stocks:
+            update_stock_list_db(df_stock_list)
+            self.stdout.write(self.style.SUCCESS("Stock data 'UPDATE' success!"))
+        if is_update_candlestick:
+            # specific_stocks_update = ['CCS', 'EXPD', 'CVCO', 'FOUR', ]
+            # df_stock_list = df_stock_list[df_stock_list['Symbol'].isin(specific_stocks_update)]
+            update_candlestick_db(df_stock_list)
+            self.stdout.write(self.style.SUCCESS("Candlestick data 'UPDATE' success!"))
+        if is_update_reports:
+            # Get all stock objects and store them in a dictionary
+            stocks = {stock.ticker: stock for stock in Stock.objects.all()}
+
+            # Loop over the stock list
+            for index, row in tqdm(df_stock_list.iterrows(), desc="Updating financial report database..."):
+                # Get symbol from Stock table
+                symbol = row['Symbol']
+                stock = stocks.get(symbol)
+                if not stock:
+                    continue
+
+                financials = yf.Ticker(symbol).quarterly_financials
+                update_reports(financials, stock, FinancialReport)
+
+                balance_sheet = yf.Ticker(symbol).quarterly_balance_sheet
+                update_reports(balance_sheet, stock, BalanceSheet)
+
+                cash_flow = yf.Ticker(symbol).quarterly_cash_flow
+                update_reports(cash_flow, stock, CashFlow)
+
+            # Success message
+            self.stdout.write(self.style.SUCCESS("Financial data 'UPDATE' success!"))
 
     def querying_delete_all_stock(self):
         self.stdout.write(self.style.WARNING("'DELETE' ALL DATA? It would be irreversible."))
         while (ans := input('(y/n) ').strip().lower()) not in ('y', 'n'):
             print("Please enter 'y' or 'n")
-        if ans.strip().lower() == 'y':
-            delete_data_from_db_table(Stock)
-            self.stdout.write(self.style.SUCCESS("Stock data 'DELETE' success!"))
+        return True if ans.strip().lower() == 'y' else False
 
-    def querying_update_all_stock(self, df_stock_list: pd.DataFrame):
+    def querying_update_stock_list(self, df_stock_list: pd.DataFrame):
         self.stdout.write(self.style.WARNING("'UPDATE' STOCK LIST?"))
         while (ans := input('(y/n) ').strip().lower()) not in ('y', 'n'):
             print("Please enter 'y' or 'n")
-        if ans.strip().lower() == 'y':
-            update_stock_list_db(df_stock_list)
-            self.stdout.write(self.style.SUCCESS("Stock data 'UPDATE' success!"))
+        return True if ans.strip().lower() == 'y' else False
 
     def querying_update_all_candlestick(self, df_stock_list: pd.DataFrame):
         self.stdout.write(self.style.WARNING("'UPDATE' CANDLESTICK DATA?"))
         print("It will delete all candlestick data and download it again.")
         while (ans := input('(y/n) ').strip().lower()) not in ('y', 'n'):
             print("Please enter 'y' or 'n")
-        if ans.strip().lower() == 'y':
-            update_candlestick_db(df_stock_list)
-            self.stdout.write(self.style.SUCCESS("Candlestick data 'UPDATE' success!"))
+        return True if ans.strip().lower() == 'y' else False
 
     def querying_update_financial_report(self, df_stock_list: pd.DataFrame):
         self.stdout.write(self.style.WARNING("'UPDATE' FINANCIAL REPORT?"))
         while (ans := input('(y/n) ').strip().lower()) not in ('y', 'n'):
             print("Please enter 'y' or 'n")
-        if ans.strip().lower() == 'n':
-            self.stdout.write(self.style.NOTICE('Financial report data "UPDATE" canceled!'))
-            return
-
-        # Get all stock objects and store them in a dictionary
-        stocks = {stock.ticker: stock for stock in Stock.objects.all()}
-
-        # Loop over the stock list
-        for index, row in tqdm(df_stock_list.iterrows(), desc="Updating financial report database..."):
-            # Get symbol from Stock table
-            symbol = row['Symbol']
-            stock = stocks.get(symbol)
-            if not stock:
-                continue
-
-            financials = yf.Ticker(symbol).quarterly_financials
-            update_reports(financials, stock, FinancialReport)
-
-            balance_sheet = yf.Ticker(symbol).quarterly_balance_sheet
-            update_reports(balance_sheet, stock, BalanceSheet)
-
-            cash_flow = yf.Ticker(symbol).quarterly_cash_flow
-            update_reports(cash_flow, stock, CashFlow)
-
-        # Success message
-        self.stdout.write(self.style.SUCCESS("Financial data 'UPDATE' success!"))
+        return True if ans.strip().lower() == 'y' else False
 
 
 def get_stock_list() -> pd.DataFrame:
@@ -133,40 +139,58 @@ def update_stock_list_db(stock_list: pd.DataFrame):
     print("All stock basic data was updated.")
 
 
-def update_candlestick_db(stock_list: pd.DataFrame):
-    # Delete all existing data
-    CandleStick.objects.all().delete()
-
-    # Prepare list to bulk update
-    l_candlesticks = []
-
+def update_candlestick_db(df_stock_list: pd.DataFrame):
     # Default downloading 3 years candlestick data
     start_date = dt.date.today() - dt.timedelta(days=365 * 3)
+
     stocks = {stock.ticker: stock for stock in Stock.objects.all()}
+    stock_list = df_stock_list['Symbol'].unique().tolist()
+    batch_size = 100
+    for i in range(0, len(stock_list), batch_size):
+        start_time = time.time()
+        print(f"\nDownloading data {i}-{i + batch_size} from yfinance...")
 
-    # Download data for all stocks at once
-    candlestick_data = {ticker: yf.download(ticker, start=start_date) for ticker in
-                        stock_list['Symbol'].unique().tolist()}
+        # Download data from yfinance
+        batch = stock_list[i:i + batch_size]
+        data = yf.download(tickers=batch, start=start_date, progress=False)
 
-    # Create candlestick objects in bulk
-    for ticker, stock_data in tqdm(candlestick_data.items(), desc="Updating candlestick table from database..."):
-        # Drop multiple columns 'Ticker'
-        stock_data.columns = stock_data.columns.droplevel('Ticker')
+        # Get tickers from downloaded data
+        tickers = data.columns.get_level_values(1).unique().tolist()
 
-        stock = stocks.get(ticker)
-        if stock:
-            for index, row in stock_data.iterrows():
-                data = row.to_dict()
-                # To turn 'Adj Close' to 'adj_close' for all keys (to match for column format of CandleStick model)
-                data = {key.replace(' ', '_').lower(): value for key, value in data.items()}
-                candlestick = CandleStick(stock=stock, date=row.name, **data, )
+        # Delete database
+        print(f"Deleting candlesticks {i}-{i + batch_size}...")
+        CandleStick.objects.filter(stock__ticker__in=tickers).delete()
 
-                # Add to pending list
+        # Prepare list to bulk update
+        l_candlesticks = []
+        for ticker in tqdm(tickers, desc=f"Updating {i}-{i + batch_size} candlestick data..."):
+            data_for_ticker = data.xs(ticker, axis=1, level=1)
+            for index, row in data_for_ticker.iterrows():
+                stock = stocks.get(ticker)
+                if not stock:
+                    continue
+
+                date = row.name
+                open_ = row['Open'] if not np.isnan(row['Open']) else None
+                high = row['High'] if not np.isnan(row['High']) else None
+                low = row['Low'] if not np.isnan(row['Low']) else None
+                close = row['Close'] if not np.isnan(row['Close']) else None
+                adj_close = row['Adj Close'] if not np.isnan(row['Adj Close']) else None
+                volume = row['Volume'] if not np.isnan(row['Volume']) else None
+
+                candlestick = CandleStick(stock=stock, date=date, open=open_, high=high, low=low, close=close,
+                                          adj_close=adj_close, volume=volume)
                 l_candlesticks.append(candlestick)
 
-    # Bulk create candlestick objects
-    CandleStick.objects.bulk_create(l_candlesticks, batch_size=100, ignore_conflicts=True)
-    print("All candlestick data was updated.")
+        # Bulk create candlestick objects
+        print("Writing to database...")
+        CandleStick.objects.bulk_create(l_candlesticks, ignore_conflicts=True)
+
+        # To avoid hitting the rate limit of yfinance
+        wait_time = 60 - (time.time() - start_time)
+        if wait_time > 0:
+            time.sleep(wait_time)
+            print("Waiting for the next batch...")
 
 
 def update_reports(report: pd.DataFrame,

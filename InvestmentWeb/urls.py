@@ -22,4 +22,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('frontpage.urls')),
     path('long_short/', include('long_short_strategy.urls')),
+    path('performance/', include('performance.urls')),
 ]

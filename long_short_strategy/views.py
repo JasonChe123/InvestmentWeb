@@ -14,10 +14,6 @@ import numpy as np
 import pandas as pd
 import re
 from typing import Tuple
-
-from pandas.core.interchange.dataframe_protocol import DataFrame
-from pandas.plotting import table
-
 from .models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
 
 market_cap = {
@@ -28,11 +24,6 @@ market_cap = {
     'Micro ($50M-$300M)': range(50_000_000, 300_000_001),
     'Nano (<$50M)': range(0, 50_000_001),
 }
-
-
-class DashboardView(View):
-    def get(self, request):
-        return render(request, 'long_short/index.html')
 
 
 class BackTestView(View):
@@ -505,14 +496,18 @@ def extract_date_suffix(date_str: str) -> dt.datetime | None:
 
 def export_csv(request):
     # Get existing portfolio
-    file = request.FILES['file']
+    file = None
+    if request.FILES.get('file'):
+        file = request.FILES['file']
     try:
         df_portfolio = pd.read_csv(file)
         df_portfolio = df_portfolio[['Financial Instrument', 'Position']]
         df_portfolio['Financial Instrument'] = df_portfolio['Financial Instrument'].str.split(' ').str[0]
-        df_portfolio['Position'] = df_portfolio['Position'].str.strip("'").astype(int)
+        replace_position = {'K': 1000, 'M': 1000000, "'": "", ",": ""}
+        df_portfolio['Position'] = df_portfolio['Position'].replace(replace_position, regex=True).astype(int)
         df_portfolio.rename(columns={'Financial Instrument': 'Ticker', 'Position': 'Existing Position'}, inplace=True)
     except Exception as e:
+        logging.warning(f"Error: {e}")
         df_portfolio = pd.DataFrame(columns=['Ticker', 'Existing Position'])
 
     # Get top and bottom stocks from backtest
@@ -551,7 +546,6 @@ def export_csv(request):
     df_execute = pd.concat([df_top_stocks, df_bottom_stocks], ignore_index=True)
     df_execute = pd.merge(df_execute, df_portfolio, on='Ticker', how='outer')
 
-    # df_execute = pd.merge(df_execute, df_portfolio, on='Ticker', how='left')
     df_execute['Existing Position'] = df_execute['Existing Position'].fillna(0)
     df_execute['Expected Position'] = df_execute['Expected Position'].fillna(0)
     df_execute['Execute Position'] = df_execute['Expected Position'].astype(int) - df_execute['Existing Position']
@@ -598,17 +592,3 @@ def get_previous_close(ticker: str, date: dt.datetime) -> float:
 
     candlestick = CandleStick.objects.filter(stock=stock, date__lt=date)
     return candlestick.last().adj_close
-
-# Parameters:
-# - Market Cap:             Mega, Large, Medium, Small, Micro
-# - Methods:                DEBIT /Total Non Current Assets
-# - Min Ipo Years:          1
-# - Positions:              20
-# - Re-balancing Months:    Feb, May, Aug, Nov
-# - Ranking Method:         Descending
-
-# todo: find a way to rank
-# - energy (Basic EPS)
-# - healthcare (Basic EPS)
-# - technology (Total Expenses / Total Assets)
-# - telecommunications

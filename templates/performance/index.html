@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %} Performance {% endblock title %}
+{% block content %}
+{% include 'partials/_messages.html' %}
+<div class="card-body w-100 p-3 shadow p-3 mb-5 bg-white rounded">
+    <!-- File uploader -->
+    {% if not portfolio %}
+    <h4>No portfolio was found</h4>
+    <div class="my-3">
+        <form method="post" action="{% url 'performance' %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <label for="formFile" class="form-label">
+                (From IB Trader WorkStation > Portfolio > right click > Import/Export > Export Page Content)
+            </label>
+            <input class="form-control" type="file" id="formFile" name="portfolio_file" accept=".csv" required
+                   title="The file must be in .csv format">
+            <button type="submit" class="btn btn-primary my-3">Upload</button>
+        </form>
+    </div>
+    {% else %}
+    <!-- Dropdown menu -->
+    <div class="dropdown float-end">
+        <!-- Dropdown button -->
+        <a href="#" class="dropdown-toggle arrow-none card-drop" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="mdi mdi-dots-horizontal"></i>
+        </a>
+        <!-- item-->
+        <div class="dropdown-menu dropdown-menu-end">
+            <a href="#" class="dropdown-item"><i class="mdi mdi-cached me-1"></i>Edit Portfolio Name</a>
+            <a href="#" class="dropdown-item"><i class="mdi mdi-cached me-1"></i>Update Portfolio</a>
+        </div>
+    </div>
+
+    <!-- Performance Tables-->
+    <h4>Ebit/Total Non-Current Assets</h4>
+    {% for df, nos_of_stock, mean in portfolio %}
+    {% if not df.empty %}
+    <a5>No. of Stocks: {{ nos_of_stock }}</a5>
+    <br>
+    <a5>Average Performance: {{ mean }}%</a5>
+    <div class="table-responsive">
+        <table class="table table-sm table-striped">
+            <!-- Header -->
+            <tr>
+                {% for col in df.columns %}
+                <th class="text-center">{{ col }}</th>
+                {% endfor %}
+            </tr>
+
+            <!-- Data -->
+            {% for i, row in df.iterrows %}
+            <tr>
+                {% for cell in row %}
+                <td>{{ cell }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+</div>
+{% endblock content%}

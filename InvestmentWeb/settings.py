@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     # my apps
     'frontpage.apps.FrontpageConfig',
     'long_short_strategy.apps.LongShortStrategyConfig',
+    'performance.apps.PerformanceConfig',
 ]
 
 MIDDLEWARE = [

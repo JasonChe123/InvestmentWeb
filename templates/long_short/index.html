@@ -1,423 +1,433 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block title %}Long Short{% endblock title %}
+
 {% block content %}
-<!-- Modal - export basket trader -->
-<div class="modal fade" id="basketTraderModal" tabindex="-1" aria-labelledby="basketTraderModalLabel"
-     aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <!-- Header -->
-            <div class="modal-header">
-                <h1 class="modal-title fs-5" id="basketTraderModalLabel">Basket Trader Setting</h1>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-
-            <!-- Body -->
-            <div class="modal-body">
-                <!-- Amount input-->
-                <div class="form-floating mb-4">
-                    <input type="number" class="form-control" id="amount" placeholder=1000 min="1000">
-                    <label for="amount">Total Amount - USD</label>
-                    <small>The amount you allow for this strategy.</small>
+<div>
+    <!-- Modal - export basket trader -->
+    <div class="modal fade" id="basketTraderModal" tabindex="-1" aria-labelledby="basketTraderModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <!-- Header -->
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="basketTraderModalLabel">Basket Trader Setting</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
-                <!-- File uploader -->
-                <div class="mb-4">
-                    <label for="formFile" class="form-label">Upload Existing Portfolio (.csv)</label>
-                    <input class="form-control" type="file" id="formFile" accept=".csv"
-                           title="The file must be in .csv format">
-                    <small>From IB Trader WorkStation>Portfolio>right click>Import/Export>Export Page Content</small>
-                    <small>(You may upload an empty csv file if you don't need re-balancing.)</small>
-                </div>
-            </div>
+                <!-- Body -->
+                <div class="modal-body">
+                    <!-- Amount input-->
+                    <div class="form-floating mb-4">
+                        <input type="number" class="form-control" id="amount" placeholder=1000 min="1000">
+                        <label for="amount">Total Amount - USD</label>
+                        <small>The amount you allow for this strategy.</small>
+                    </div>
 
-            <!-- Footer -->
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="close_button">
-                    Close
-                </button>
-                <button type="button" class="btn btn-primary" disabled id="export_button">Export
-                </button>
+                    <!-- File uploader -->
+                    <div class="mb-4">
+                        <label for="formFile" class="form-label">Upload Existing Portfolio (.csv)</label>
+                        <input class="form-control" type="file" id="formFile" accept=".csv"
+                               title="The file must be in .csv format">
+                        <small>From IB Trader WorkStation>Portfolio>right click>Import/Export>Export Page
+                            Content</small>
+                        <small>(You may upload an empty csv file if you don't need re-balancing.)</small>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="close_button">
+                        Close
+                    </button>
+                    <button type="button" class="btn btn-primary" disabled id="export_button">Export
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Modal - message -->
-<div class="modal fade" id="messageModal" tabindex="-1" role="dialog" aria-labelledby="messageModalLabel"
-     aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title text-danger" id="messageModalLabel">Important Information</h5>
-            </div>
-            <div class="modal-body" id="messageModalBody">
+    <!-- Modal - message -->
+    <div class="modal fade" id="messageModal" tabindex="-1" role="dialog" aria-labelledby="messageModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger" id="messageModalLabel">Important Information</h5>
+                </div>
+                <div class="modal-body" id="messageModalBody">
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Input params -->
-<div class="accordion accordion-flush" id="accordionFlush">
-    <div class="accordion-item">
-        <h2 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                    data-bs-target="#flush-collapseOne" aria-expanded="false" aria-controls="flush-collapseOne"
-                    id="collapse_params_button">
-                <b>Backtest Parameters</b>
-            </button>
-        </h2>
-        <div id="flush-collapseOne" class="accordion-collapse collapse" data-bs-parent="#accordionFlush">
-            <div class="accordion-body">
-                <div class="row">
-                    <div class="col-md-12">
-                        <!-- Backtest parameters -->
-                        <div>
-                            <form action="{% url 'longshort-backtest' %}" method="post">
-                                {% csrf_token %}
-                                <!-- Parameters -->
-                                <div class="row">
-                                    <!-- Market Cap -->
-                                    <div class="col-md-3 my-1">
-                                        <label>Market Cap</label>
-                                        <div class="card">
-                                            <div class="card-body ">
-                                                {% for mc in market_cap %}
-                                                <div class="col-md-12 my-1">
-                                                    <input class="form-check-input" type="checkbox" id={{ mc }}
-                                                           name="market_cap"
-                                                           {% if mc in selected_market_cap %}checked{% endif %}
-                                                           value="{{ mc }}">
-                                                    <label class="form-check-label" for={{ mc }}>{{ mc }}</label>
+    <!-- Input params -->
+    <div class="accordion accordion-flush" id="accordionFlush">
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#flush-collapseOne" aria-expanded="false" aria-controls="flush-collapseOne"
+                        id="collapse_params_button">
+                    <b>Backtest Parameters</b>
+                </button>
+            </h2>
+            <div id="flush-collapseOne" class="accordion-collapse collapse" data-bs-parent="#accordionFlush">
+                <div class="accordion-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <!-- Backtest parameters -->
+                            <div>
+                                <form action="{% url 'longshort-backtest' %}" method="post">
+                                    {% csrf_token %}
+                                    <!-- Parameters -->
+                                    <div class="row">
+                                        <!-- Market Cap -->
+                                        <div class="col-md-3 my-1">
+                                            <label>Market Cap</label>
+                                            <div class="card">
+                                                <div class="card-body ">
+                                                    {% for mc in market_cap %}
+                                                    <div class="col-md-12 my-1">
+                                                        <input class="form-check-input" type="checkbox" id={{ mc }}
+                                                               name="market_cap"
+                                                               {% if mc in selected_market_cap %}checked{% endif %}
+                                                               value="{{ mc }}">
+                                                        <label class="form-check-label" for={{ mc }}>{{ mc }}</label>
+                                                    </div>
+                                                    {% endfor %}
                                                 </div>
-                                                {% endfor %}
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <!-- Methods -->
-                                    <div class="col-md-9 my-1">
-                                        <label>Methods</label>
                                         <!-- Methods -->
-                                        <div class="card">
-                                            <div class="card-body">
-                                                <!-- search bar -->
-                                                <div class="row p-2">
-                                                    <div class="col-md-12">
-                                                        <!-- search bar -->
-                                                        <div class="form-group mb-0">
-                                                            <input type="text" class="form-control" id="search-field"
-                                                                   placeholder="Search">
+                                        <div class="col-md-9 my-1">
+                                            <label>Methods</label>
+                                            <!-- Methods -->
+                                            <div class="card">
+                                                <div class="card-body">
+                                                    <!-- search bar -->
+                                                    <div class="row p-2">
+                                                        <div class="col-md-12">
+                                                            <!-- search bar -->
+                                                            <div class="form-group mb-0">
+                                                                <input type="text" class="form-control"
+                                                                       id="search-field"
+                                                                       placeholder="Search">
+                                                            </div>
+                                                            <div class="dropdown-menu" id="search-result"></div>
                                                         </div>
-                                                        <div class="dropdown-menu" id="search-result"></div>
+                                                    </div>
+
+                                                    <!-- other fields -->
+                                                    <div class="row p-2">
+                                                        <!-- Financial -->
+                                                        <div class="form-group col-md-3 my-1 align-self-end">
+                                                            <label for="methods_financial">Income Statement</label>
+                                                            <select id="methods_financial" name='methods_financial'
+                                                                    class="form-control method-selector">
+                                                                {% for m in methods_financial %}
+                                                                {% if m == selected_financial_method %}
+                                                                <option selected>{{ m }}</option>
+                                                                {% else %}
+                                                                <option>{{ m }}</option>
+                                                                {% endif %}
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+
+                                                        <!-- Balance Sheet -->
+                                                        <div class="form-group col-md-3 my-1 align-self-end">
+                                                            <label for="methods_balance_sheet">Balance Sheet</label>
+                                                            <select id="methods_balance_sheet"
+                                                                    name='methods_balance_sheet'
+                                                                    class="form-control method-selector">
+                                                                {% for m in methods_balance_sheet %}
+                                                                {% if m == selected_balance_sheet_method %}
+                                                                <option selected>{{ m }}</option>
+                                                                {% else %}
+                                                                <option>{{ m }}</option>
+                                                                {% endif %}
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+
+                                                        <!-- Cash Flow -->
+                                                        <div class="form-group col-md-3 my-1 align-self-end">
+                                                            <label for="methods_cash_flow">Cash Flow</label>
+                                                            <select id="methods_cash_flow" name='methods_cash_flow'
+                                                                    class="form-control method-selector">
+                                                                {% for m in methods_cash_flow %}
+                                                                {% if m == selected_cash_flow_method %}
+                                                                <option selected>{{ m }}</option>
+                                                                {% else %}
+                                                                <option>{{ m }}</option>
+                                                                {% endif %}
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+
+                                                        <!-- Operator buttons -->
+                                                        <div class="col-md-3">
+                                                            <div class="row">
+                                                                <button type="button"
+                                                                        class="btn btn-outline-primary operator me-1"
+                                                                        style="width: 40px;" value="+">+
+                                                                </button>
+                                                                <button type="button"
+                                                                        class="btn btn-outline-primary operator me-1"
+                                                                        style="width: 40px;" value="-">-
+                                                                </button>
+                                                                <button type="button"
+                                                                        class="btn btn-outline-primary operator me-1"
+                                                                        style="width: 40px;" value="*">x
+                                                                </button>
+                                                                <button type="button"
+                                                                        class="btn btn-outline-primary operator me-1"
+                                                                        style="width: 40px;" value="/">/
+                                                                </button>
+                                                            </div>
+                                                            <div class="row mt-1">
+                                                                <button type="button"
+                                                                        class="btn btn-outline-secondary operator me-1"
+                                                                        style="width: 40px;" value="(">(
+                                                                </button>
+                                                                <button type="button"
+                                                                        class="btn btn-outline-secondary operator me-1"
+                                                                        style="width: 40px;" value=")">)
+                                                                </button>
+                                                                <button type="button"
+                                                                        class="btn btn-outline-danger operator me-1"
+                                                                        style="width: 85px;" value="AC">AC
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-
-                                                <!-- other fields -->
-                                                <div class="row p-2">
-                                                    <!-- Financial -->
-                                                    <div class="form-group col-md-3 my-1 align-self-end">
-                                                        <label for="methods_financial">Income Statement</label>
-                                                        <select id="methods_financial" name='methods_financial'
-                                                                class="form-control method-selector">
-                                                            {% for m in methods_financial %}
-                                                            {% if m == selected_financial_method %}
-                                                            <option selected>{{ m }}</option>
-                                                            {% else %}
-                                                            <option>{{ m }}</option>
-                                                            {% endif %}
-                                                            {% endfor %}
-                                                        </select>
-                                                    </div>
-
-                                                    <!-- Balance Sheet -->
-                                                    <div class="form-group col-md-3 my-1 align-self-end">
-                                                        <label for="methods_balance_sheet">Balance Sheet</label>
-                                                        <select id="methods_balance_sheet" name='methods_balance_sheet'
-                                                                class="form-control method-selector">
-                                                            {% for m in methods_balance_sheet %}
-                                                            {% if m == selected_balance_sheet_method %}
-                                                            <option selected>{{ m }}</option>
-                                                            {% else %}
-                                                            <option>{{ m }}</option>
-                                                            {% endif %}
-                                                            {% endfor %}
-                                                        </select>
-                                                    </div>
-
-                                                    <!-- Cash Flow -->
-                                                    <div class="form-group col-md-3 my-1 align-self-end">
-                                                        <label for="methods_cash_flow">Cash Flow</label>
-                                                        <select id="methods_cash_flow" name='methods_cash_flow'
-                                                                class="form-control method-selector">
-                                                            {% for m in methods_cash_flow %}
-                                                            {% if m == selected_cash_flow_method %}
-                                                            <option selected>{{ m }}</option>
-                                                            {% else %}
-                                                            <option>{{ m }}</option>
-                                                            {% endif %}
-                                                            {% endfor %}
-                                                        </select>
-                                                    </div>
-
-                                                    <!-- Operator buttons -->
-                                                    <div class="col-md-3">
-                                                        <div class="row">
-                                                            <button type="button"
-                                                                    class="btn btn-outline-primary operator me-1"
-                                                                    style="width: 40px;" value="+">+
-                                                            </button>
-                                                            <button type="button"
-                                                                    class="btn btn-outline-primary operator me-1"
-                                                                    style="width: 40px;" value="-">-
-                                                            </button>
-                                                            <button type="button"
-                                                                    class="btn btn-outline-primary operator me-1"
-                                                                    style="width: 40px;" value="*">x
-                                                            </button>
-                                                            <button type="button"
-                                                                    class="btn btn-outline-primary operator me-1"
-                                                                    style="width: 40px;" value="/">/
-                                                            </button>
-                                                        </div>
-                                                        <div class="row mt-1">
-                                                            <button type="button"
-                                                                    class="btn btn-outline-secondary operator me-1"
-                                                                    style="width: 40px;" value="(">(
-                                                            </button>
-                                                            <button type="button"
-                                                                    class="btn btn-outline-secondary operator me-1"
-                                                                    style="width: 40px;" value=")">)
-                                                            </button>
-                                                            <button type="button"
-                                                                    class="btn btn-outline-danger operator me-1"
-                                                                    style="width: 85px;" value="AC">AC
-                                                            </button>
-                                                        </div>
-                                                    </div>
+                                                <div class="card-footer">
+                                                    Selected Method:<br>
+                                                    <b id="selected_method" class="py-3">
+                                                        {% if selected_method %} {{ selected_method }} {% else %} Please
+                                                        select a method...
+                                                        {% endif %}
+                                                    </b>
+                                                    <input type="hidden" name="selected_method"
+                                                           id="selected_method_input"
+                                                           {% if selected_method %} value="{{ selected_method }}"
+                                                           {% else %} value="" {% endif %}>
                                                 </div>
                                             </div>
-                                            <div class="card-footer">
-                                                Selected Method:<br>
-                                                <b id="selected_method" class="py-3">
-                                                    {% if selected_method %} {{ selected_method }} {% else %} Please
-                                                    select a method...
-                                                    {% endif %}
-                                                </b>
-                                                <input type="hidden" name="selected_method" id="selected_method_input"
-                                                       {% if selected_method %} value="{{ selected_method }}"
-                                                       {% else %} value="" {% endif %}>
+                                        </div>
+
+                                        <!-- Other params -->
+                                        <div class="col-md-12 my-1">
+                                            <div class="row my-3">
+                                                <!-- Ipo years -->
+                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                    <label for="ipo_years">Min IPO Years</label>
+                                                    <select id="ipo_years" name='ipo_years' class="form-control">
+                                                        {% for y in ipo_years %}
+                                                        {% if y == selected_ipo_years %}
+                                                        <option selected>{{ y }}</option>
+                                                        {% else %}
+                                                        <option>{{ y }}</option>
+                                                        {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+
+                                                <!-- Sectors -->
+                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                    <label for="sectors">Sector</label>
+                                                    <select id="sectors" name="sectors" class="form-control">
+                                                        {% for s in sectors %}
+                                                        {% if s == selected_sectors %}
+                                                        <option selected>{{ s }}</option>
+                                                        {% else %}
+                                                        <option>{{ s }}</option>
+                                                        {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+
+                                                <!-- Backtest years -->
+                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                    <label for="backtest_years">Backtest Years</label>
+                                                    <select id="backtest_years" name="backtest_years"
+                                                            class="form-control">
+                                                        {% for y in backtest_years %}
+                                                        {% if y == selected_backtest_years %}
+                                                        <option selected>{{ y }}</option>
+                                                        {% else %}
+                                                        <option>{{ y }}</option>
+                                                        {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+
+                                                <!-- Positions hold -->
+                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                    <label for="pos_hold">Position</label>
+                                                    <select id="pos_hold" name="pos_hold" class="form-control">
+                                                        {% for p in pos_hold %}
+                                                        {% if p == selected_pos_hold %}
+                                                        <option selected>{{ p }}</option>
+                                                        {% else %}
+                                                        <option>{{ p }}</option>
+                                                        {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+
+                                                <!-- Re-balancing months -->
+                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                    <label for="re_balancing_months">Re-balancing Months</label>
+                                                    <select id="re_balancing_months" name="re_balancing_months"
+                                                            class="form-control">
+                                                        {% for m in re_balancing_months %}
+                                                        {% if m == selected_re_balancing_months %}
+                                                        <option selected>{{ m }}</option>
+                                                        {% else %}
+                                                        <option>{{ m }}</option>
+                                                        {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+
+                                                <!-- Ranking methods -->
+                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                    <label for="ranking_method">Ranking Method</label>
+                                                    <select id="ranking_method" name="ranking_method"
+                                                            class="form-control">
+                                                        {% if selected_ranking_method == 'Descending' %}
+                                                        <option selected>Descending</option>
+                                                        <option>Ascending</option>
+                                                        {% else %}
+                                                        <option>Descending</option>
+                                                        <option selected>Ascending</option>
+                                                        {% endif %}
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Other params -->
-                                    <div class="col-md-12 my-1">
-                                        <div class="row my-3">
-                                            <!-- Ipo years -->
-                                            <div class="form-group col-md-2 my-1 align-self-end">
-                                                <label for="ipo_years">Min IPO Years</label>
-                                                <select id="ipo_years" name='ipo_years' class="form-control">
-                                                    {% for y in ipo_years %}
-                                                    {% if y == selected_ipo_years %}
-                                                    <option selected>{{ y }}</option>
-                                                    {% else %}
-                                                    <option>{{ y }}</option>
-                                                    {% endif %}
-                                                    {% endfor %}
-                                                </select>
-                                            </div>
-
-                                            <!-- Sectors -->
-                                            <div class="form-group col-md-2 my-1 align-self-end">
-                                                <label for="sectors">Sector</label>
-                                                <select id="sectors" name="sectors" class="form-control">
-                                                    {% for s in sectors %}
-                                                    {% if s == selected_sectors %}
-                                                    <option selected>{{ s }}</option>
-                                                    {% else %}
-                                                    <option>{{ s }}</option>
-                                                    {% endif %}
-                                                    {% endfor %}
-                                                </select>
-                                            </div>
-
-                                            <!-- Backtest years -->
-                                            <div class="form-group col-md-2 my-1 align-self-end">
-                                                <label for="backtest_years">Backtest Years</label>
-                                                <select id="backtest_years" name="backtest_years" class="form-control">
-                                                    {% for y in backtest_years %}
-                                                    {% if y == selected_backtest_years %}
-                                                    <option selected>{{ y }}</option>
-                                                    {% else %}
-                                                    <option>{{ y }}</option>
-                                                    {% endif %}
-                                                    {% endfor %}
-                                                </select>
-                                            </div>
-
-                                            <!-- Positions hold -->
-                                            <div class="form-group col-md-2 my-1 align-self-end">
-                                                <label for="pos_hold">Position</label>
-                                                <select id="pos_hold" name="pos_hold" class="form-control">
-                                                    {% for p in pos_hold %}
-                                                    {% if p == selected_pos_hold %}
-                                                    <option selected>{{ p }}</option>
-                                                    {% else %}
-                                                    <option>{{ p }}</option>
-                                                    {% endif %}
-                                                    {% endfor %}
-                                                </select>
-                                            </div>
-
-                                            <!-- Re-balancing months -->
-                                            <div class="form-group col-md-2 my-1 align-self-end">
-                                                <label for="re_balancing_months">Re-balancing Months</label>
-                                                <select id="re_balancing_months" name="re_balancing_months"
-                                                        class="form-control">
-                                                    {% for m in re_balancing_months %}
-                                                    {% if m == selected_re_balancing_months %}
-                                                    <option selected>{{ m }}</option>
-                                                    {% else %}
-                                                    <option>{{ m }}</option>
-                                                    {% endif %}
-                                                    {% endfor %}
-                                                </select>
-                                            </div>
-
-                                            <!-- Ranking methods -->
-                                            <div class="form-group col-md-2 my-1 align-self-end">
-                                                <label for="ranking_method">Ranking Method</label>
-                                                <select id="ranking_method" name="ranking_method" class="form-control">
-                                                    {% if selected_ranking_method == 'Descending' %}
-                                                    <option selected>Descending</option>
-                                                    <option>Ascending</option>
-                                                    {% else %}
-                                                    <option>Descending</option>
-                                                    <option selected>Ascending</option>
-                                                    {% endif %}
-                                                </select>
-                                            </div>
-                                        </div>
+                                    <!-- Submit button -->
+                                    <div class="col-md-1">
+                                        <button type="submit" class="btn btn-primary col-md-12">Start</button>
                                     </div>
-                                </div>
-
-                                <!-- Submit button -->
-                                <div class="col-md-1">
-                                    <button type="submit" class="btn btn-primary col-md-12">Start</button>
-                                </div>
-                            </form>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Backtest result -->
-<div class="row">
-    <div class="col-md-12">
-        {% include 'partials/_messages.html' %}
+    <!-- Backtest result -->
+    <div class="row">
+        <div class="col-md-12">
+            {% include 'partials/_messages.html' %}
 
-        <!-- Only show if result is received (long_total/ short_total)-->
-        <div {% if long_total or short_total %}class="d-block" {% else %}class="d-none" {% endif %}>
-            <!-- Title -->
-            <h4 class="my-3">
-                Backtest Result for Top {{ selected_pos_hold }} and Bottom {{ selected_pos_hold }} Stocks<br>
-            </h4>
-            <h5>
-                Sector - {{ selected_sectors }}<br>
-                Ranked by - {{ selected_method }}
-            </h5>
-            <ul>
-                <li>(The unit of ranking result is either billion, million or thousand if the value > 1,000 or <
-                    -1,000)
-                </li>
-                <li>(Stocks are omitted if the stock price is under $10 on re-balancing date)</li>
-            </ul>
+            <!-- Only show if result is received (long_total/ short_total)-->
+            <div {% if long_total or short_total %}class="d-block" {% else %}class="d-none" {% endif %}>
+                <!-- Title -->
+                <h4 class="my-3">
+                    Backtest Result for Top {{ selected_pos_hold }} and Bottom {{ selected_pos_hold }} Stocks<br>
+                </h4>
+                <h5>
+                    Sector - {{ selected_sectors }}<br>
+                    Ranked by - {{ selected_method }}
+                </h5>
+                <ul>
+                    <li>(The unit of ranking result is either billion, million or thousand if the value > 1,000 or <
+                        -1,000)
+                    </li>
+                    <li>(Stocks are omitted if the stock price is under $10 on re-balancing date)</li>
+                </ul>
 
-            <!-- Top stocks -->
-            <div class="row">
-                <p>
-                    Top {{ selected_pos_hold }} Stocks (Total Performance
-                    {% if long_total < 0 %}
-                    <b style="color: red">{{ long_total }}</b>
-                    {% else %}
-                    <b>{{ long_total }}</b>
-                    {% endif %}
-                    </b>
-                    )
-                </p>
-                <!-- Used to toggle collapse area of backtest parameters -->
-                {% if long_total %}<input type="hidden" id="long_total" value="{{long_total}}">{% endif %}
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped" id="table_top">
-                        <!-- Header -->
-                        <tr>
-                            {% for col in df_top.columns %}
-                            <th class="text-center">{{ col }}</th>
+                <!-- Top stocks -->
+                <div class="row">
+                    <p>
+                        Top {{ selected_pos_hold }} Stocks (Total Performance
+                        {% if long_total < 0 %}
+                        <b style="color: red">{{ long_total }}</b>
+                        {% else %}
+                        <b>{{ long_total }}</b>
+                        {% endif %}
+                        </b>
+                        )
+                    </p>
+                    <!-- Used to toggle collapse area of backtest parameters -->
+                    {% if long_total %}<input type="hidden" id="long_total" value="{{long_total}}">{% endif %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped" id="table_top">
+                            <!-- Header -->
+                            <tr>
+                                {% for col in df_top.columns %}
+                                <th class="text-center">{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+
+                            <!-- Data -->
+                            {% for i, row in df_top.iterrows %}
+                            <tr>
+                                {% for cell in row %}
+                                <td>{{ cell }}</td>
+                                {% endfor %}
+                            </tr>
                             {% endfor %}
-                        </tr>
-
-                        <!-- Data -->
-                        {% for i, row in df_top.iterrows %}
-                        <tr>
-                            {% for cell in row %}
-                            <td>{{ cell }}</td>
-                            {% endfor %}
-                        </tr>
-                        {% endfor %}
-                    </table>
+                        </table>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Bottom stocks -->
-            <div class="row">
-                <p>
-                    Bottom {{ selected_pos_hold }} Stocks (Total Performance
-                    {% if short_total < 0%}
-                    <b style="color: red;">{{ short_total }}</b>
-                    {% else %}
-                    <b>{{ short_total }}</b>
-                    {% endif %}
-                    )
-                </p>
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped" id="table_bottom">
-                        <!-- Header -->
-                        <tr>
-                            {% for col in df_bottom.columns %}
-                            <th class="text-center">{{ col }}</th>
-                            {% endfor %}
-                        </tr>
+                <!-- Bottom stocks -->
+                <div class="row">
+                    <p>
+                        Bottom {{ selected_pos_hold }} Stocks (Total Performance
+                        {% if short_total < 0%}
+                        <b style="color: red;">{{ short_total }}</b>
+                        {% else %}
+                        <b>{{ short_total }}</b>
+                        {% endif %}
+                        )
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped" id="table_bottom">
+                            <!-- Header -->
+                            <tr>
+                                {% for col in df_bottom.columns %}
+                                <th class="text-center">{{ col }}</th>
+                                {% endfor %}
+                            </tr>
 
-                        <!-- Data -->
-                        {% for i, row in df_bottom.iterrows %}
-                        <tr>
-                            {% for cell in row %}
-                            <td>{{ cell }}</td>
+                            <!-- Data -->
+                            {% for i, row in df_bottom.iterrows %}
+                            <tr>
+                                {% for cell in row %}
+                                <td>{{ cell }}</td>
+                                {% endfor %}
+                            </tr>
                             {% endfor %}
-                        </tr>
-                        {% endfor %}
-                    </table>
+                        </table>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Export button -->
-            <div class="row mt-3">
-                <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#basketTraderModal">
-                    Export Basket Trading File for IB Trader WorkStation
-                </button>
+                <!-- Export button -->
+                <div class="row mt-3 p-3">
+                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#basketTraderModal">
+                        Export Basket Trading File for IB Trader WorkStation
+                    </button>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- CSRF token -->
+    <input type="hidden" id="csrf_token" value="{{ csrf_token }}">
 </div>
 
-<!-- CSRF token -->
-<input type="hidden" id="csrf_token" value="{{ csrf_token }}">
-
 <!-- Script -->
-<script src="{% static 'js/backtest.js' %}"></script>
+<script src="{% static 'js/longshort.js' %}"></script>
 {% endblock content %}

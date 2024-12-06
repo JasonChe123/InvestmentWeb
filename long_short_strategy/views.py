@@ -13,6 +13,7 @@ import logging
 import numpy as np
 import pandas as pd
 import re
+from tqdm import tqdm
 from typing import Tuple
 from .models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
 
@@ -401,7 +402,7 @@ def get_performance(result_subset: dict, method: str, pos_hold: int) -> Tuple[pd
     l_to_months = l_from_months[1:] + [this_month]
 
     # Loop through all periods
-    for from_month, to_month in zip(l_from_months, l_to_months):
+    for from_month, to_month in tqdm(zip(l_from_months, l_to_months), desc="Getting performance..."):
         # Initialize dataframe
         df = result_subset[from_month]
         df['Performance'] = np.nan
@@ -433,8 +434,13 @@ def get_performance(result_subset: dict, method: str, pos_hold: int) -> Tuple[pd
                 continue
 
             # Calculate performance
-            price_from = float(candlesticks.first().open)
-            price_to = float(candlesticks.last().adj_close)
+            try:
+                price_from = float(candlesticks.first().open)
+                price_to = float(candlesticks.last().adj_close)
+            except:
+                price_from = 0.0
+                price_to = 0.0
+
             if price_from < 10:
                 # Avoid stocks with too low price, too risky
                 logging.warning(f"Ticker: {row['Ticker']}: Price is too low: ({price_from}) "

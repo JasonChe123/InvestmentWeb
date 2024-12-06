@@ -33,11 +33,16 @@
 
     <!-- Performance Tables-->
     <h4>Ebit/Total Non-Current Assets</h4>
+    <div>
+        <input type="button" class="btn btn-primary" value="Save" id="export_button">
+    </div>
     {% for df, nos_of_stock, mean in portfolio %}
     {% if not df.empty %}
+    <!-- Summary -->
     <a5>No. of Stocks: {{ nos_of_stock }}</a5>
     <br>
     <a5>Average Performance: {{ mean }}%</a5>
+    <!-- Table -->
     <div class="table-responsive">
         <table class="table table-sm table-striped">
             <!-- Header -->
@@ -46,7 +51,6 @@
                 <th class="text-center">{{ col }}</th>
                 {% endfor %}
             </tr>
-
             <!-- Data -->
             {% for i, row in df.iterrows %}
             <tr>
@@ -56,9 +60,40 @@
             </tr>
             {% endfor %}
         </table>
+        <!--        &lt;!&ndash; Pagination links &ndash;&gt;-->
+        <!--        <div class="pagination">-->
+        <!--        <span class="step-links">-->
+        <!--            {% if page_obj.has_previous %}-->
+        <!--            <a href="#" class="page-link" data-page="{{ page_obj.previous_page_number }}">Previous</a>-->
+        <!--            {% endif %}-->
+        <!--            <span class="current">-->
+        <!--                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.-->
+        <!--            </span>-->
+        <!--            {% if page_obj.has_next %}-->
+        <!--            <a href="#" class="page-link" data-page="{{ page_obj.next_page_number }}">Next</a>-->
+        <!--            {% endif %}-->
+        <!--        </span>-->
+        <!--        </div>-->
     </div>
     {% endif %}
     {% endfor %}
     {% endif %}
 </div>
+<!-- AJAX script -->
+<script>
+    $(document).ready(function () {
+        $('.page-link').on('click', function (e) {
+            e.preventDefault();
+            var page = $(this).data('page');
+            var url = '?page=' + page;
+            $.ajax({
+                type: 'GET',
+                url: url,
+                success: function (data) {
+                    $('#table-container').html(data);
+                }
+            });
+        });
+    });
+</script>
 {% endblock content%}

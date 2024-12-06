@@ -1,6 +1,9 @@
 import datetime as dt
 from django.contrib import messages
+from django.core.paginator import Paginator
+from django.http import JsonResponse
 from django.shortcuts import render
+from django.template.loader import render_to_string
 from django.views import View
 import logging
 import numpy as np
@@ -10,6 +13,22 @@ from long_short_strategy.models import Stock, CandleStick
 
 class PerformanceView(View):
     def get(self, request):
+        # todo: setting up pagination
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            page = request.GET.get('page')
+            paginator_positive = Paginator(self.df_positive.values, 10)
+            page_obj_positive = paginator_positive.get_page(page)
+            paginator_negative = Paginator(self.df_negative.values, 10)
+            page_obj_negative = paginator_negative.get_page(page)
+            context = {
+                'portfolio': [
+                    [self.df_positive, len(self.df_positive), self.mean_positive, page_obj_positive],
+                    [self.df_negative, len(self.df_negative), self.mean_negative, page_obj_negative],
+                ],
+            }
+            table_html = render_to_string('performance/table.html', context)
+            return JsonResponse({'table_html': table_html})
+
         return render(request, 'performance/index.html')
 
     def post(self, request):

@@ -1,6 +1,7 @@
 import datetime as dt
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 import logging
 from long_short_strategy.models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
 import numpy as np
@@ -159,7 +160,8 @@ def update_candlestick_db(df_stock_list: pd.DataFrame):
 
         # Delete database
         print(f"Deleting candlesticks {i}-{i + batch_size}...")
-        CandleStick.objects.filter(stock__ticker__in=tickers).delete()
+        stocks_obj = Stock.objects.filter(ticker__in=tickers)
+        CandleStick.objects.filter(Q(stock__ticker__in=tickers)).delete()
 
         # Prepare list to bulk update
         l_candlesticks = []

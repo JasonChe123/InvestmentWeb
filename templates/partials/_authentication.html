@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- Login Page -->
+<div class="container mt-5 card shadow p-3" style="max-width: 450px;">
+    <div>
+        {% block authentication_content %}
+        {% endblock authentication_content %}
+    </div>
+</div>
+{% endblock %}

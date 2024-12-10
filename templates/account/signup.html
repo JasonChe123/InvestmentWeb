@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load widget_tweaks %}
+{% block title %}{% trans "Sign Up" %}{% endblock title %}
+{% block content %}
+<!-- Sign Up Page -->
+<div class="container mt-5 card shadow p-3" style="max-width: 450px;">
+    <div>
+        <h1 class="text-center mb-4">{% trans "Sign Up" %}</h1>
+        <!-- Login form -->
+        <form class="login" method="POST" action="{% url 'account_signup' %}">
+            {% csrf_token %}
+
+            <!-- Sign in -->
+            <div class="d-flex justify-content-center">
+                <h6>Already have an account? <a href="{% url 'account_login' %}">sign in</a></h6>
+            </div>
+            <!-- Customize fields -->
+            {% for field in form %}
+            <div class="form-floating mb-3">
+                {{ field|add_class:"form-control" }}
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {% if field.help_text %}
+                <small class="form-text text-muted">{{ field.help_text }}</small>
+                {% endif %}
+                {% for error in field.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ error }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+
+            {% if redirect_field_value %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}"/>
+            {% endif %}
+
+            <!-- Submit button -->
+            <button class="btn btn-primary w-100" type="submit">{% trans "Sign Up" %}</button>
+        </form>
+
+
+    </div>
+</div>
+{% endblock content %}

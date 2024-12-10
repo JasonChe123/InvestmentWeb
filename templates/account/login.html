@@ -1,0 +1,73 @@
+{% extends "partials/_authentication.html" %}
+{% load i18n %}
+{% load account socialaccount %}
+{% load widget_tweaks %}
+
+{% block title %}{% trans "Sign In" %}{% endblock %}
+{% block authentication_content %}
+<!-- Login Page -->
+<h1 class="text-center mb-4">{% trans "Sign In" %}</h1>
+
+<!-- Check social provider -->
+{% get_providers as socialaccount_providers %}
+{% if socialaccount_providers %}
+{% include "socialaccount/snippets/login_extra.html" %}
+{% else %}
+<p class="text-center">
+    {% blocktrans %}If you have not created an account yet, then please
+    <a href="{{ signup_url }}">sign up</a> first.{% endblocktrans %}
+</p>
+{% endif %}
+
+<!-- Login form -->
+<form class="login" method="POST" action="{% url 'account_login' %}">
+    {% csrf_token %}
+
+    <!-- Customize fields -->
+    {% for field in form %}
+    <div class="form-floating mb-3">
+        {% if field.label == "Remember Me" %}
+        <div class="form-check">
+            {{ field|add_class:"form-check-input" }}
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        </div>
+        {% else %}
+        {{ field|add_class:"form-control" }}
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {% endif %}
+        {% if field.help_text %}
+        <small class="form-text text-muted">{{ field.help_text }}</small>
+        {% endif %}
+        {% for error in field.errors %}
+        <div class="invalid-feedback d-block">
+            {{ error }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+    {% if redirect_field_value %}
+    <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}"/>
+    {% endif %}
+
+    <!-- Submit button -->
+    <button class="btn btn-primary w-100" type="submit">{% trans "Sign In" %}</button>
+</form>
+
+<!-- Seperator -->
+<div class="text-center p-2">
+    <b>OR</b>
+</div>
+
+<!-- Login with social account -->
+<div>
+    <ul class="socialaccount_providers list-unstyled">
+        {% include "socialaccount/snippets/provider_list.html" with process="login" %}
+    </ul>
+</div>
+
+<!-- Sign up -->
+<div class="d-flex justify-content-center">
+    <h6>Don't have an account? <a href="{{ signup_url }}">sign up</a></h6>
+</div>
+{% endblock %}

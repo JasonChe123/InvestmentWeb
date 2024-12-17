@@ -1,99 +1,327 @@
 {% extends 'base.html' %}
-{% block title %} Performance {% endblock title %}
+{% load humanize %}
+{% block title %}Performance{% endblock title %}
+
 {% block content %}
-{% include 'partials/_messages.html' %}
-<div class="card-body w-100 p-3 shadow p-3 mb-5 bg-white rounded">
-    <!-- File uploader -->
-    {% if not portfolio %}
-    <h4>No portfolio was found</h4>
-    <div class="my-3">
-        <form method="post" action="{% url 'performance' %}" enctype="multipart/form-data">
-            {% csrf_token %}
-            <label for="formFile" class="form-label">
-                (From IB Trader WorkStation > Portfolio > right click > Import/Export > Export Page Content)
-            </label>
-            <input class="form-control" type="file" id="formFile" name="portfolio_file" accept=".csv" required
-                   title="The file must be in .csv format">
-            <button type="submit" class="btn btn-primary my-3">Upload</button>
-        </form>
-    </div>
-    {% else %}
-    <!-- Dropdown menu -->
-    <div class="dropdown float-end">
-        <!-- Dropdown button -->
-        <a href="#" class="dropdown-toggle arrow-none card-drop" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="mdi mdi-dots-horizontal"></i>
-        </a>
-        <!-- item-->
-        <div class="dropdown-menu dropdown-menu-end">
-            <a href="#" class="dropdown-item"><i class="mdi mdi-cached me-1"></i>Edit Portfolio Name</a>
-            <a href="#" class="dropdown-item"><i class="mdi mdi-cached me-1"></i>Update Portfolio</a>
+<!-- Modal (loading) -->
+{% include 'partials/_loading_modal.html' %}
+
+<!-- Add portfolio -->
+<div class="my-3 text-end">
+    <form method="GET" action="{% url 'add_portfolio' %}">
+        <button class="btn btn-primary" style="width: 150px;"><b>Add Portfolio</b></button>
+    </form>
+</div>
+
+<!-- Show portfolio -->
+{% for data in portfolio %}
+<div class="card-body p-3 mb-5 rounded shadow-lg">
+    <!-- Header -->
+    <div class="p-3">
+        <div class="row">
+
+            <!-- Info -->
+            <div class="col-9">
+                <table class="table table-borderless">
+                    <tr>
+                        <th class="w-25">Group Name</th>
+                        <td class="w-75">{{ data.group_name }}</td>
+                    </tr>
+                    <tr>
+                        <th class="w-25">Created on</th>
+                        <td class="w-75">{{ data.created }}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Control buttons -->
+            <div class="col-3 text-end">
+                <button class="btn btn-outline-secondary mx-1" value="{{ data.group_name }}" name="edit"
+                        style="width: 100px;">Edit
+                </button>
+                <button class="btn btn-outline-danger mx-1" value="{{ data.group_name }}" name="delete"
+                        style="width: 100px;">Delete
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Performance Tables-->
-    <h4>Ebit/Total Non-Current Assets</h4>
-    <div>
-        <input type="button" class="btn btn-primary" value="Save" id="export_button">
-    </div>
-    {% for df, nos_of_stock, mean in portfolio %}
-    {% if not df.empty %}
-    <!-- Summary -->
-    <a5>No. of Stocks: {{ nos_of_stock }}</a5>
-    <br>
-    <a5>Average Performance: {{ mean }}%</a5>
-    <!-- Table -->
-    <div class="table-responsive">
-        <table class="table table-sm table-striped">
+    <!-- Details of portfolio -->
+    <div class="row">
+        <!-- Summary for positive position -->
+        <div class="col-sm-6 p-3">
             <!-- Header -->
-            <tr>
-                {% for col in df.columns %}
-                <th class="text-center">{{ col }}</th>
-                {% endfor %}
-            </tr>
-            <!-- Data -->
-            {% for i, row in df.iterrows %}
-            <tr>
-                {% for cell in row %}
-                <td>{{ cell }}</td>
-                {% endfor %}
-            </tr>
-            {% endfor %}
-        </table>
-        <!--        &lt;!&ndash; Pagination links &ndash;&gt;-->
-        <!--        <div class="pagination">-->
-        <!--        <span class="step-links">-->
-        <!--            {% if page_obj.has_previous %}-->
-        <!--            <a href="#" class="page-link" data-page="{{ page_obj.previous_page_number }}">Previous</a>-->
-        <!--            {% endif %}-->
-        <!--            <span class="current">-->
-        <!--                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.-->
-        <!--            </span>-->
-        <!--            {% if page_obj.has_next %}-->
-        <!--            <a href="#" class="page-link" data-page="{{ page_obj.next_page_number }}">Next</a>-->
-        <!--            {% endif %}-->
-        <!--        </span>-->
-        <!--        </div>-->
+            <h6><i>Positive Position ({{ data.positive.no_of_stocks }} stocks)</i></h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered">
+                    <tr>
+                        <th class="text-center">Initial Cost</th>
+                        <th class="text-center">Average Perf (%)</th>
+                        <th class="text-center">Profit</th>
+                    </tr>
+                    <tr>
+                        <td class="text-end">{{ data.positive.initial_cost|intcomma }}</td>
+
+                        {% if data.positive.mean_performance < 0 %}
+                        <td class="text-end text-danger">{{ data.positive.mean_performance|intcomma }}</td>
+                        {% else %}
+                        <td class="text-end">{{ data.positive.mean_performance|intcomma }}</td>
+                        {% endif %}
+
+                        {% if data.positive.profit < 0 %}
+                        <td class="text-end text-danger">{{ data.positive.profit|intcomma }}</td>
+                        {% else %}
+                        <td class="text-end">{{ data.positive.profit|intcomma }}</td>
+                        {% endif %}
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Breakdown tables -->
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered">
+                    <!-- Table header -->
+                    <tr>
+                        {% for col in data.positive.df.columns %}
+                        <th class="text-center">{{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                    <!-- Table data -->
+                    {% for i, row in data.positive.df.iterrows %}
+                    <tr>
+                        {% for cell in row %}
+                        <!-- Is a number -->
+                        {% if cell|floatformat:"2" %}
+                        {% if cell < 0 %}
+                        <td class="text-end text-danger">
+                            ( {{ cell|floatformat:"2"|slice:"1:"|intcomma }} )
+                        </td>
+                        {% else %}
+                        <td class="text-end">{{ cell|floatformat:"2"|intcomma }}</td>
+                        {% endif %}
+
+                        <!-- Is not a number -->
+                        {% else %}
+                        <td class="text-center">{{ cell }}</td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+
+        <!-- Summary for negative position -->
+        <div class="col-sm-6 p-3">
+            <!-- Header -->
+            <h6 class="text-danger"><i>Negative Position ({{ data.negative.no_of_stocks }} stocks)</i></h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered">
+                    <tr>
+                        <th class="text-center">Initial Cost</th>
+                        <th class="text-center">Average Perf (%)</th>
+                        <th class="text-center">Profit</th>
+                    </tr>
+                    <tr>
+                        <td class="text-end">{{ data.negative.initial_cost|intcomma }}</td>
+
+                        {% if data.negative.mean_performance < 0 %}
+                        <td class="text-end text-danger">{{ data.negative.mean_performance|intcomma }}</td>
+                        {% else %}
+                        <td class="text-end">{{ data.negative.mean_performance|intcomma }}</td>
+                        {% endif %}
+
+                        {% if data.negative.profit < 0 %}
+                        <td class="text-end text-danger">{{ data.negative.profit|intcomma }}</td>
+                        {% else %}
+                        <td class="text-end">{{ data.negative.profit|intcomma }}</td>
+                        {% endif %}
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Breakdown tables -->
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered">
+                    <!-- Table header -->
+                    <tr>
+                        {% for col in data.negative.df.columns %}
+                        <th class="text-center">{{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                    <!-- Table data -->
+                    {% for i, row in data.negative.df.iterrows %}
+                    <tr>
+                        {% for cell in row %}
+
+                        <!-- Is a number -->
+                        {% if cell|floatformat:"2" %}
+                        {% if cell < 0 %}
+                        <td class="text-end text-danger">
+                            ( {{ cell|floatformat:"2"|slice:"1:"|intcomma }} )
+                        </td>
+                        {% else %}
+                        <td class="text-end">{{ cell|floatformat:"2"|intcomma }}</td>
+                        {% endif %}
+
+                        <!-- Is not a number -->
+                        {% else %}
+                        <td class="text-center">{{ cell }}</td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
     </div>
-    {% endif %}
-    {% endfor %}
-    {% endif %}
 </div>
-<!-- AJAX script -->
+{% endfor %}
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmation-modal" tabindex="-1" aria-labelledby="confirmation-modal-label"
+     aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmation-modal-label">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this portfolio?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Portfolio Modal -->
+<div class="modal fade" id="edit-portfolio-modal" tabindex="-1" aria-labelledby="update-portfolio-modal-label"
+     aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="update-portfolio-modal-label">Edit Portfolio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Portfolio name -->
+                <label for="input-portfolio-name">Portfolio Name</label>
+                <input class="form-control" id="input-portfolio-name" placeholder="" name="portfolio_name"
+                       data-toggle="tooltip-portfolio-name" data-placement="top" title="Please enter a portfolio name"
+                       required>
+                <div id="portfolio-name-error" class="text-danger mb-3" style="display: none;">
+                    This portfolio name already exists.
+                </div>
+
+                <!-- File uploader -->
+                <input class="form-control my-3" type="file" id="form-file" name="portfolio_file" accept=".csv"
+                       title="The file must be in .csv format">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirm-edit">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     $(document).ready(function () {
-        $('.page-link').on('click', function (e) {
-            e.preventDefault();
-            var page = $(this).data('page');
-            var url = '?page=' + page;
+        const loadingModal = new bootstrap.Modal($('#loadingModal'));
+        var portfolioToDelete = null;
+        var portfolioToEdit = null;
+
+        // Event handler for delete buttons
+        $('button[name="delete"]').each(function () {
+            $(this).click(function () {
+                portfolioToDelete = $(this).val();
+
+                // Show confirmation modal
+                $('#confirmation-modal').modal('show');
+            });
+        });
+
+        // Event handler for confirmation modal buttons
+        $('#confirm-delete').click(function () {
+            if (portfolioToDelete) {
+                $.ajax({
+                    url: "{% url 'delete_portfolio' %}",
+                    type: "POST",
+                    data: JSON.stringify({
+                        portfolio_name: portfolioToDelete
+                    }),
+                    contentType: "application/json",
+                    dataType: "json",
+                    headers: {
+                        "X-CSRFToken": "{{ csrf_token }}"
+                    },
+                    success: function (response) {
+                        if (response.status === "success") {
+                            location.reload();
+                        } else {
+                            alert("Error deleting portfolio: " + response.message);
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        console.error("Error deleting portfolio:", error);
+                        alert("An error occurred while deleting the portfolio.");
+                    }
+                });
+            }
+            $('#confirmation-modal').modal('hide');
+        });
+
+        // Event handler for edit buttons
+        $('button[name="edit"]').each(function () {
+            $(this).click(function () {
+                portfolioToEdit = this.value;
+
+                // Show confirmation modal
+                $('#edit-portfolio-modal').modal('show');
+            });
+        });
+
+        // Event handler for edit portfolio modal buttons
+        $('#confirm-edit').click(function () {
+            var inputPortfolioName = document.querySelector('#input-portfolio-name');
+            var fileInput = document.querySelector('#form-file');
+            var formData = new FormData();
+
+            // Add file and portfolio_name
+            if (fileInput.files.length > 0) {
+                formData.append('portfolio_file', fileInput.files[0]);
+            } else {
+                formData.append('portfolio_file', false);
+            }
+            formData.append('portfolio_name', portfolioToEdit);
+            formData.append('new_portfolio_name', inputPortfolioName.value);
+
+            // POST request
+            $('#edit-portfolio-modal').modal('hide');
+            loadingModal.show();
             $.ajax({
-                type: 'GET',
-                url: url,
-                success: function (data) {
-                    $('#table-container').html(data);
+                url: "{% url 'edit_portfolio' %}",
+                type: "POST",
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    location.reload();
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error editing portfolio: ", error);
+                    alert("An error occurred while editing the portfolio.");
+                    location.reload();
                 }
             });
         });
     });
 </script>
-{% endblock content%}
+{% endblock content %}

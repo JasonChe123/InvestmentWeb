@@ -1,11 +1,20 @@
 document.addEventListener('DOMContentLoaded', function () {
     const csrf_token = document.querySelector("#csrf_token").value;
+    const startBtn = document.querySelector("#startBtn");
     const amountInput = document.querySelector("#amount");
     const fileInput = document.querySelector("#formFile");
     const exportButton = document.querySelector("#export_button");
     const closeButton = document.querySelector("#close_button");
+    const basketTraderModal = new bootstrap.Modal(document.getElementById('basketTraderModal'));
     const messageModal = new bootstrap.Modal(document.getElementById('messageModal'));
     const messageModalBody = document.getElementById('messageModalBody');
+    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+
+    // Start button event handlers
+    startBtn.addEventListener('click', function () {
+        loadingModal.show();
+        loadingModal.hide()
+    });
 
     // Add selected method
     function addSelectedMethod(method) {
@@ -36,13 +45,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Table formatting: add new-line before and after 'to' in all table headers
+// Table formatting: add new-line before and after 'to' in all table headers
     const heads = document.getElementsByTagName('th');
     for (let i = 0; i < heads.length; i++) {
         heads[i].innerHTML = heads[i].innerHTML.replaceAll(" to ", "<br>to<br>");
     }
 
-    // Table formatting: change color to 'red' for negative values, and align all numbers to the right
+// Table formatting: change color to 'red' for negative values, and align all numbers to the right
     const cells = document.getElementsByTagName('td');
     for (let i = 0; i < cells.length; i++) {
         const value = parseFloat(cells[i].textContent);
@@ -58,13 +67,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Table formatting: add border to all tables
+// Table formatting: add border to all tables
     const tables = document.getElementsByTagName('table');
     for (let i = 0; i < tables.length; i++) {
         tables[i].style.border = '1px solid #bbb';
     }
 
-    // Table formatting: add left border to all ticker columns
+// Table formatting: add left border to all ticker columns
     for (let i = 0; i < heads.length; i++) {  // i starts from 1 because i need to ignore the first comlumn
         if (heads[i].textContent === 'Ticker') {
             const symbolColumnIndex = heads[i].cellIndex;
@@ -78,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Methods search bar
+// Methods search bar
     const search_field = document.querySelector("#search-field");
     const search_result = document.querySelector("#search-result");
     search_result.style.display = "none";
@@ -127,14 +136,14 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     });
 
-    // Set value of selected method
+// Set value of selected method
     document.querySelectorAll('.method-selector').forEach(function (method_selector) {
         method_selector.addEventListener('change', function () {
             addSelectedMethod(this.value);
         });
     });
 
-    // Operator event
+// Operator event
     const selected_method = document.getElementById("selected_method");
     const selected_method_input = document.getElementById("selected_method_input");
     document.querySelectorAll('.operator').forEach(function (operator) {
@@ -203,13 +212,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Auto hide 'Backtest Parameters'
+// Auto hide 'Backtest Parameters'
     const long_total = document.getElementById("long_total");
     if (!long_total) {
         document.getElementById("collapse_params_button").click();
     }
 
-    // Validate amount from basket trader
+// Validate amount from basket trader
     amountInput.addEventListener("keyup", function (event) {
         const value = event.target.value;
         if (value === "" || Number(value) === 0) {
@@ -221,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Validate file format from basket trader
+// Validate file format from basket trader
     fileInput.addEventListener("change", function (event) {
         const value = event.target.value;
         if (!value.endsWith(".csv")) {
@@ -233,7 +242,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Validate the export button
+// Validate the export button
     function validateExportButton() {
         exportButton.disabled =
             amountInput.classList.contains("is-invalid") ||
@@ -241,8 +250,11 @@ document.addEventListener('DOMContentLoaded', function () {
             amountInput.value === ""
     }
 
-    // Export button event
+// Export button event
     exportButton.addEventListener('click', function () {
+        basketTraderModal.hide();
+        loadingModal.show();
+
         // Extract table data
         const table_top_data = extractTableData(document.querySelector("#table_top"));
         const table_bottom_data = extractTableData(document.querySelector("#table_bottom"));
@@ -282,8 +294,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             })
             .then(blob => {
+                loadingModal.hide();
+
                 // Show important information
-                messageModalBody.textContent = "Please carefully read the downloaded basket trader file, it may close all your positions after submitted to IB-TWS, which is not relevant to this strategy. You can edit the file if necessary.";
+                messageModalBody.textContent = "Please carefully read the downloaded basket trader file, IB-TWS may close all irrelevant positions after receiving the file. Please edit the file if necessary.";
                 messageModal.show();
 
                 // Download the file

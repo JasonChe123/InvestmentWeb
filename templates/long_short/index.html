@@ -5,7 +5,7 @@
 
 {% block content %}
 <div>
-    <!-- Modal - export basket trader -->
+    <!-- Modal (export basket trader) -->
     <div class="modal fade" id="basketTraderModal" tabindex="-1" aria-labelledby="basketTraderModalLabel"
          aria-hidden="true">
         <div class="modal-dialog">
@@ -20,19 +20,18 @@
                 <div class="modal-body">
                     <!-- Amount input-->
                     <div class="form-floating mb-4">
-                        <input type="number" class="form-control" id="amount" placeholder=1000 min="1000">
+                        <input type="number" class="form-control" id="amount" placeholder=1000 min=1000>
                         <label for="amount">Total Amount - USD</label>
                         <small>The amount allocated for this strategy.</small>
                     </div>
 
                     <!-- File uploader -->
                     <div class="mb-4">
-                        <label for="formFile" class="form-label">Upload Existing Portfolio (.csv)</label>
+                        <label for="formFile" class="form-label">( Optional ) Upload Existing Portfolio (.csv)</label>
                         <input class="form-control" type="file" id="formFile" accept=".csv"
                                title="The file must be in .csv format">
                         <small>From IB Trader WorkStation>Portfolio>right click>Import/Export>Export Page
                             Content</small>
-                        <small>(You may upload an empty csv file if you don't need re-balancing.)</small>
                     </div>
                 </div>
 
@@ -48,7 +47,7 @@
         </div>
     </div>
 
-    <!-- Modal - message -->
+    <!-- Modal (important information) -->
     <div class="modal fade" id="messageModal" tabindex="-1" role="dialog" aria-labelledby="messageModalLabel"
          aria-hidden="true">
         <div class="modal-dialog" role="document">
@@ -62,9 +61,14 @@
         </div>
     </div>
 
+    <!-- Modal (loading) -->
+    {% include 'partials/_loading_modal.html' %}
+
     <!-- Input params -->
     <div class="accordion accordion-flush" id="accordionFlush">
+        <!-- Collapsible area -->
         <div class="accordion-item">
+            <!-- Header -->
             <h2 class="accordion-header">
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                         data-bs-target="#flush-collapseOne" aria-expanded="false" aria-controls="flush-collapseOne"
@@ -72,11 +76,12 @@
                     <b>Backtest Parameters</b>
                 </button>
             </h2>
+            <!-- Collapsible body -->
             <div id="flush-collapseOne" class="accordion-collapse collapse" data-bs-parent="#accordionFlush">
                 <div class="accordion-body">
+                    <!-- Backtest parameters -->
                     <div class="row">
                         <div class="col-md-12">
-                            <!-- Backtest parameters -->
                             <div>
                                 <form action="{% url 'longshort-backtest' %}" method="post">
                                     {% csrf_token %}
@@ -223,7 +228,7 @@
                                         <div class="col-md-12 my-1">
                                             <div class="row my-3">
                                                 <!-- Ipo years -->
-                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                <div class="form-group col-md-2 my-2 align-self-end" hidden>
                                                     <label for="ipo_years">Min IPO Years</label>
                                                     <select id="ipo_years" name='ipo_years' class="form-control">
                                                         {% for y in ipo_years %}
@@ -237,7 +242,7 @@
                                                 </div>
 
                                                 <!-- Sectors -->
-                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                <div class="form-group col-md-2 my-2 align-self-end">
                                                     <label for="sectors">Sector</label>
                                                     <select id="sectors" name="sectors" class="form-control">
                                                         {% for s in sectors %}
@@ -251,7 +256,7 @@
                                                 </div>
 
                                                 <!-- Backtest years -->
-                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                <div class="form-group col-md-2 my-2 align-self-end">
                                                     <label for="backtest_years">Backtest Years</label>
                                                     <select id="backtest_years" name="backtest_years"
                                                             class="form-control">
@@ -266,11 +271,25 @@
                                                 </div>
 
                                                 <!-- Positions hold -->
-                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                <div class="form-group col-md-2 my-2 align-self-end">
                                                     <label for="pos_hold">Position</label>
                                                     <select id="pos_hold" name="pos_hold" class="form-control">
                                                         {% for p in pos_hold %}
                                                         {% if p == selected_pos_hold %}
+                                                        <option selected>{{ p }}</option>
+                                                        {% else %}
+                                                        <option>{{ p }}</option>
+                                                        {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+
+                                                <!-- Minimum stock price -->
+                                                <div class="form-group col-md-2 my-1 align-self-end">
+                                                    <label for="min_stock_price">Min Stock Price</label>
+                                                    <select id="min_stock_price" name="min_stock_price" class="form-control">
+                                                        {% for p in min_stock_price %}
+                                                        {% if p == selected_min_stock_price %}
                                                         <option selected>{{ p }}</option>
                                                         {% else %}
                                                         <option>{{ p }}</option>
@@ -314,7 +333,8 @@
 
                                     <!-- Submit button -->
                                     <div class="col-md-1">
-                                        <button type="submit" class="btn btn-primary col-md-12">Start</button>
+                                        <button id="startBtn" type="submit" class="btn btn-primary col-md-12">Start
+                                        </button>
                                     </div>
                                 </form>
                             </div>
@@ -328,8 +348,6 @@
     <!-- Backtest result -->
     <div class="row">
         <div class="col-md-12">
-            {% include 'partials/_messages.html' %}
-
             <!-- Only show if result is received (long_total/ short_total)-->
             <div {% if long_total or short_total %}class="d-block" {% else %}class="d-none" {% endif %}>
                 <!-- Title -->

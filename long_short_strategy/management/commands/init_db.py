@@ -1,4 +1,6 @@
 import datetime as dt
+import pdb
+
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
@@ -145,8 +147,10 @@ def update_candlestick_db(df_stock_list: pd.DataFrame):
     start_date = dt.date.today() - dt.timedelta(days=365 * 3)
 
     stocks = {stock.ticker: stock for stock in Stock.objects.all()}
+    df_stock_list = df_stock_list[df_stock_list['Symbol'].str.len() < 5]
+    df_stock_list = df_stock_list[~df_stock_list['Symbol'].str.contains('/')]
     stock_list = df_stock_list['Symbol'].unique().tolist()
-    batch_size = 100
+    batch_size = 200
     for i in range(0, len(stock_list), batch_size):
         start_time = time.time()
         print(f"\nDownloading data {i}-{i + batch_size} from yfinance...")

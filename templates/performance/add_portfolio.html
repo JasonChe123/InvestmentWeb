@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}Add Portfolio{% endblock title %}
+
+{% block content %}
+<!-- Modal (loading) -->
+{% include 'partials/_loading_modal.html' %}
+
+<div class="card-body w-100 p-3 shadow p-3 mb-5 bg-white rounded">
+    <!-- Portfolio uploader -->
+    <h4>Add a portfolio</h4>
+    <p>Please upload a portfolio. You can export the csv file from
+        IB Trader WorkStation > Portfolio > right click > Import/Export > Export Page Content.
+        Then select that file from the below 'Browse...' button and upload it.</p>
+
+    <form method="post" enctype="multipart/form-data" id="portfolio-form">
+        {% csrf_token %}
+        <!-- Portfolio name -->
+        <label for="input-portfolio-name">Portfolio Name</label>
+        <input class="form-control" id="input-portfolio-name" placeholder="" name="portfolio_name"
+               data-toggle="tooltip-portfolio-name" data-placement="top" title="Please enter a portfolio name"
+               required>
+        <div id="portfolio-name-error" class="text-danger mb-3" style="display: none;">This portfolio name already
+            exists.
+        </div>
+        <div id="portfolio-name-empty" class="text-danger mb-3" style="display: none;">Portfolio name cannot be empty.
+        </div>
+
+        <!-- File uploader -->
+        <input class="form-control mt-3" type="file" id="form-file" name="portfolio_file" accept=".csv" required
+               title="The file must be in .csv format">
+        <div id="file-type-error" class="text-danger" style="display: none;">The file type must be csv</div>
+
+        <button type="submit" class="btn btn-primary mt-3" id="submit-button" disabled>Upload</button>
+    </form>
+</div>
+
+<script>
+    $(document).ready(function () {
+        const loadingModal = new bootstrap.Modal($('#loadingModal'));
+
+        const inputFile = $('#form-file');
+        const fileTypeError = $('#file-type-error');
+        var fileTypeValid = false;
+
+        const portfolioNameInput = $('#input-portfolio-name');
+        const portfolioNameError = $('#portfolio-name-error');
+        const portfolioNameEmpty = $('#portfolio-name-empty');
+        var portfolioNameValid = false;
+
+        const submitButton = $('#submit-button');
+
+        // Check portfolio name uniqueness
+        portfolioNameInput.keyup(function () {
+            if (this.value.trim()) {
+                portfolioNameEmpty.hide();
+                $.ajax({
+                    url: "{% url 'check_portfolio_name' %}",
+                    type: "POST",
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': '{{ csrf_token }}',
+                    },
+                    data: {
+                        portfolio_name: this.value.trim(),
+                    },
+                    success: function (response) {
+                        if (response.exists) {
+                            portfolioNameError.show()
+                            portfolioNameValid = false;
+                        } else {
+                            portfolioNameError.hide()
+                            portfolioNameValid = true;
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        portfolioNameValid = true;
+                        console.error("Error checking portfolio name:", error);
+                    }
+                });
+            } else {
+                portfolioNameError.hide()
+                portfolioNameEmpty.show();
+                portfolioNameValid = false;
+            }
+
+            validateForm();
+        });
+
+        // Check file type
+        inputFile.change(function (event) {
+            var fileType = event.target.files[0].type;
+
+            if (fileType !== "text/csv") {
+                fileTypeError.show()
+                fileTypeValid = false;
+            } else {
+                fileTypeError.hide()
+                fileTypeValid = true;
+            }
+
+            validateForm();
+        })
+
+        // Show loading modal
+        submitButton.click(function (event) {
+            loadingModal.show();
+        });
+
+        function validateForm() {
+            if (portfolioNameValid && fileTypeValid) {
+                submitButton.prop('disabled', false);
+            } else {
+                submitButton.prop('disabled', true);
+            }
+        }
+    });
+</script>
+{% endblock content %}

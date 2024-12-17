@@ -2,161 +2,334 @@ import datetime as dt
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import render
-from django.template.loader import render_to_string
-from django.views import View
+from django.shortcuts import render, redirect
+from django.urls import reverse
+from django.views.decorators.http import require_POST, require_GET
+import json
 import logging
-import numpy as np
 import pandas as pd
 from long_short_strategy.models import Stock, CandleStick
-
-
-
-class PerformanceView(View):
-    def get(self, request):
-        return render(request, 'performance/index.html')
-
-    def post(self, request):
-        uploaded_file = request.FILES.get('portfolio_file')
-
-        # Empty file
-        try:
-            df = pd.read_csv(uploaded_file)
-        except pd.errors.EmptyDataError:
-            messages.warning(request, "The file is empty or not in .csv format.")
-            return render(request, 'performance/index.html')
-
-        # Invalid columns
-        if not {'Financial Instrument', 'Position', 'Avg Price'}.issubset(df.columns):
-            messages.warning(request, "The file must contain 'Financial Instrument', 'Position' and 'Avg Price' columns.")
-            return render(request, 'performance/index.html')
-
-        # Invalid data
-        replace_position = {'K': 1000, 'M': 1000000, "'": "", ",": ""}
-        df['Position'] = df['Position'].replace(replace_position, regex=True)
-        try:
-            df['Position'] = df['Position'].astype(float)
-            df['Avg Price'] = df['Avg Price'].astype(float)
-        except ValueError:
-            messages.warning(request, "Invalid data in 'Position'/'Avg Price' column, please check the file.")
-            return render(request, 'performance/index.html')
-
-        # Format data
-        try:
-            df = df[['Financial Instrument', 'Position', 'Avg Price']]
-            df = df.dropna()
-            df['Financial Instrument'] = df['Financial Instrument'].str.split(' ').str[0]
-            df['Avg Price'] = df['Avg Price'].round(2)
-            df['Last Price'] = df['Financial Instrument'].apply(get_last_close).astype(float)
-        except Exception as e:
-            logging.warning(f"Error: {e}")
-            messages.warning(request, "Something wrong in your file, please check.")
-            return render(request, 'performance/index.html')
-
-        # Split into positive and negative
-        df = df.sort_values('Position', ascending=True)
-        mask = np.where(df['Position'] >= 0, True, False)
-        df_positive = df[mask]
-        df_negative = df[~mask]
-
-        # Sort by Ticker
-        df_positive = df_positive.sort_values('Financial Instrument', ascending=True)
-        df_negative = df_negative.sort_values('Financial Instrument', ascending=True)
-
-        # Add mean row
-        df_positive['Performance (%)'] = (df['Last Price'] - df['Avg Price']) / df['Avg Price'] * 100
-        df_negative['Performance (%)'] = (df['Avg Price'] - df['Last Price']) / df['Avg Price'] * 100
-        df_positive['Performance (%)'] = df_positive['Performance (%)'].replace(-100, np.nan)
-        df_negative['Performance (%)'] = df_negative['Performance (%)'].replace(100, np.nan)
-        df_positive['Performance (%)'] = df_positive['Performance (%)'].round(2)
-        df_negative['Performance (%)'] = df_negative['Performance (%)'].round(2)
-        mean_positive = round(df_positive['Performance (%)'].mean(), 2)
-        mean_negative = round(df_negative['Performance (%)'].mean(), 2)
-
-        context = {
-            'portfolio': [
-                [df_positive, len(df_positive), mean_positive],
-                [df_negative, len(df_negative), mean_negative],
-            ],
-        }
-        return render(request, 'performance/index.html', context)
+from .models import Performance
 
 
 @login_required
+@require_GET
 def home(request):
-    if request.method == 'get':
-        return render(request, 'performance/index.html')
+    # Get user's portfolio
+    portfolio = get_portfolio(request)
+    if not portfolio:
+        return redirect('add_portfolio')
+
+    # Consolidate data
+    grouped_portfolio = {}
+    # {
+    #  'group_name': [{'financial_instrument': '',
+    #                  'position': 0,
+    #                  'avg_price': 0,
+    #                  'last_price': 0,
+    #                  'performance_percentage': 0
+    #                  }, ...],
+    # 'group_name': [{...}, {...}, ...]
+    # }
+    for perf in portfolio:
+        # Create group
+        if perf.group_name not in grouped_portfolio:
+            grouped_portfolio[perf.group_name] = []
+
+        # Append data
+        grouped_portfolio[perf.group_name].append({
+            'financial_instrument': perf.financial_instrument,
+            'position': perf.position,
+            'avg_price': perf.avg_price,
+            'last_price': perf.last_price,
+            'performance_percentage': perf.performance_percentage,
+        })
+
+    # Prepare context
+    processed_portfolio = []
+    for group_name, data in grouped_portfolio.items():
+        df_portfolio = pd.DataFrame(data)
+        df_positive, df_negative, mean_positive, mean_negative = data_cleaning(df_portfolio)
+        df_negative['Cost'] = abs(df_negative['Cost'])
+        init_cost_positive = int(df_positive['Cost'].sum())
+        init_cost_negative = int(df_negative['Cost'].sum())
+
+        # Append to processed portfolio
+        processed_portfolio.append({
+            'group_name': group_name,
+            'created': dt.datetime.strftime(perf.created_at, '%d %b %Y'),
+            'last_update': None,
+            'positive': {
+                'df': df_positive,
+                'no_of_stocks': len(df_positive),
+                'initial_cost': init_cost_positive,
+                'mean_performance': mean_positive,
+                'profit': round(df_positive['Profit'].sum(), 2),
+            },
+            'negative': {
+                'df': df_negative,
+                'no_of_stocks': len(df_negative),
+                'initial_cost': init_cost_negative,
+                'mean_performance': mean_negative,
+                'profit': round(df_negative['Profit'].sum(), 2),
+            }
+        })
+
+    context = {'portfolio': processed_portfolio}
+
+    return render(request, 'performance/index.html', context)
+
+
+@login_required
+def add_portfolio(request):
+    if request.method == 'GET':
+        return render(request, 'performance/add_portfolio.html')
     elif request.method == 'POST':
-        return get_portfolio(request)
-    else:
-        return render(request, 'performance/index.html')
+        return save_portfolio(request)
 
 
-def get_portfolio(request):
+@login_required
+@require_POST
+def check_portfolio_name(request):
+    portfolio_name = request.POST.get('portfolio_name', '')
+    exists = Performance.objects.filter(user=request.user, group_name=portfolio_name).exists()
+    return JsonResponse({'exists': exists})
+
+
+@login_required
+@require_POST
+def save_portfolio(request):
+    try:
+        error_message, portfolio = get_upload_portfolio(request)
+        if error_message:
+            messages.warning(request, error_message)
+            return redirect('add_portfolio')
+        portfolio_name = request.POST.get('portfolio_name')
+        portfolio_positive, portfolio_negative, _, _ = data_cleaning(portfolio)
+
+        with transaction.atomic():
+            # Delete existing data for this user's portfolio
+            Performance.objects.filter(user=request.user, group_name=portfolio_name).delete()
+
+            # Save new records
+            performance_data = []
+            for df in [portfolio_positive, portfolio_negative]:
+                for _, row in df.iterrows():
+                    performance_data.append(
+                        Performance(
+                            user=request.user,
+                            group_name=portfolio_name,
+                            financial_instrument=row['Ticker'],
+                            position=row['Position'],
+                            avg_price=row['Average Price'],
+                            last_price=row['Last Price'],
+                            performance_percentage=row['Perf (%)']
+                        )
+                    )
+            Performance.objects.bulk_create(performance_data)
+
+        # Django messages
+        messages.success(request, "Portfolio saved successfully.")
+
+        return redirect('performance')
+    except Exception as e:
+        logging.error(f"Error saving performance: {str(e)}")
+        messages.warning(request, "Error saving portfolio. Please check the file.")
+
+        return redirect('performance')
+
+
+@login_required
+@require_POST
+def edit_portfolio(request):
+    # Get params
+    portfolio_name = request.POST.get('portfolio_name')
+    new_portfolio_name = request.POST.get('new_portfolio_name')
+    file = request.FILES.get('portfolio_file')
+
+    try:
+        with transaction.atomic():
+            if new_portfolio_name and new_portfolio_name.strip():
+                if new_portfolio_name.strip() == portfolio_name:
+                    messages.info(request, f"The new portfolio name '{new_portfolio_name}' is the same as the current one.")
+                else:
+                    # Update portfolio name
+                    Performance.objects.filter(
+                        user=request.user,
+                        group_name=portfolio_name
+                    ).update(group_name=new_portfolio_name)
+                    messages.success(request, f"The portfolio '{portfolio_name}' was renamed to '{new_portfolio_name}'.")
+                    portfolio_name = new_portfolio_name
+
+            if file:
+                error_message, portfolio = get_upload_portfolio(request)
+                if error_message:
+                    messages.warning(request, error_message)
+                    return JsonResponse({'status': 'error'})
+
+                portfolio_positive, portfolio_negative, _, _ = data_cleaning(portfolio)
+
+                # Delete existing data for this user's portfolio
+                Performance.objects.filter(user=request.user, group_name=portfolio_name).delete()
+
+                # Save new records
+                performance_data = []
+                for df in [portfolio_positive, portfolio_negative]:
+                    for _, row in df.iterrows():
+                        performance_data.append(
+                            Performance(
+                                user=request.user,
+                                group_name=portfolio_name,
+                                financial_instrument=row['Ticker'],
+                                position=row['Position'],
+                                avg_price=row['Average Price'],
+                                last_price=row['Last Price'],
+                                performance_percentage=row['Perf (%)']
+                            )
+                        )
+
+                Performance.objects.bulk_create(performance_data)
+                messages.success(request, f"Portfolio '{portfolio_name}' updated successfully.")
+
+            return JsonResponse({'status': 'success'})
+    except Exception as e:
+        logging.error(f"Error editing portfolio: {str(e)}")
+        messages.warning(request, "Error editing portfolio. Please check the file.")
+        return JsonResponse({'status': 'error'})
+
+
+@login_required
+@require_POST
+def delete_portfolio(request):
+    try:
+        data = json.loads(request.body)
+        portfolio_name = data.get('portfolio_name')
+
+        if not portfolio_name:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Portfolio name is required'
+            }, status=400)
+
+        # Delete the portfolio
+        deleted_count, _ = Performance.objects.filter(user=request.user, group_name=portfolio_name).delete()
+
+        if deleted_count > 0:
+            messages.success(request, f"Portfolio '{portfolio_name}' deleted successfully.")
+            return JsonResponse({
+                'status': 'success',
+                'message': f"Portfolio '{portfolio_name}' deleted successfully.",
+                'redirect_url': reverse('performance')
+            })
+        else:
+            return JsonResponse({
+                'status': 'error',
+                'message': f"No portfolio found with name '{portfolio_name}'"
+            }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid JSON data'
+        }, status=400)
+    except Exception as e:
+        logging.error(f"Error deleting performance: {str(e)}")
+        return JsonResponse({
+            'status': 'error',
+            'message': 'An error occurred while deleting the portfolio'
+        }, status=500)
+
+
+def get_portfolio(request) -> pd.DataFrame:
+    portfolio = Performance.objects.filter(user=request.user).order_by('group_name')
+    return portfolio
+
+
+def get_upload_portfolio(request) -> (str, pd.DataFrame):
     uploaded_file = request.FILES.get('portfolio_file')
-
     # Empty file
     try:
         df = pd.read_csv(uploaded_file)
-    except pd.errors.EmptyDataError:
-        messages.warning(request, "The file is empty or not in .csv format.")
-        return render(request, 'performance/index.html')
+    except Exception as e:
+        logging.warning(f"Error reading csv: {e}")
+        message = "Something wrong, check the file."
+        return message, None
+
+    # Invalid rows
+    df = df.dropna(subset=['Financial Instrument', 'Position', 'Avg Price'])
 
     # Invalid columns
     if not {'Financial Instrument', 'Position', 'Avg Price'}.issubset(df.columns):
-        messages.warning(request, "The file must contain 'Financial Instrument', 'Position' and 'Avg Price' columns.")
-        return render(request, 'performance/index.html')
+        message = "The file must contain 'Financial Instrument', 'Position' and 'Avg Price' columns."
+        return message, None
 
     # Invalid data
-    replace_position = {'K': 1000, 'M': 1000000, "'": "", ",": ""}
-    df['Position'] = df['Position'].replace(replace_position, regex=True)
+    replace_format = {'K': 1000, 'M': 1000000, "'": "", ",": ""}
+    df['Position'] = df['Position'].replace(replace_format, regex=True)
+    df['Avg Price'] = df['Avg Price'].replace(replace_format, regex=True)
     try:
         df['Position'] = df['Position'].astype(float)
         df['Avg Price'] = df['Avg Price'].astype(float)
     except ValueError:
-        messages.warning(request, "Invalid data in 'Position'/'Avg Price' column, please check the file.")
-        return render(request, 'performance/index.html')
+        message = "Invalid data in 'Position'/'Avg Price' column, please check the file."
+        return message, None
 
-    # Format data
-    try:
-        df = df[['Financial Instrument', 'Position', 'Avg Price']]
-        df = df.dropna()
-        df['Financial Instrument'] = df['Financial Instrument'].str.split(' ').str[0]
-        df['Avg Price'] = df['Avg Price'].round(2)
-        df['Last Price'] = df['Financial Instrument'].apply(get_last_close).astype(float)
-    except Exception as e:
-        logging.warning(f"Error: {e}")
-        messages.warning(request, "Something wrong in your file, please check.")
-        return render(request, 'performance/index.html')
+    # Invalid average price
+    if 0 in df['Avg Price'].tolist():
+        message = "The average price cannot be zero."
+        return message, None
 
-    # Split into positive and negative
-    df = df.sort_values('Position', ascending=True)
-    mask = np.where(df['Position'] >= 0, True, False)
-    df_positive = df[mask]
-    df_negative = df[~mask]
+    # Extract ticker
+    df['Financial Instrument'] = df['Financial Instrument'].str.split(' ').str[0]
 
-    # Sort by Ticker
-    df_positive = df_positive.sort_values('Financial Instrument', ascending=True)
-    df_negative = df_negative.sort_values('Financial Instrument', ascending=True)
+    return "", df[['Financial Instrument', 'Position', 'Avg Price']]
 
-    # Add mean row
-    df_positive['Performance (%)'] = (df['Last Price'] - df['Avg Price']) / df['Avg Price'] * 100
-    df_negative['Performance (%)'] = (df['Avg Price'] - df['Last Price']) / df['Avg Price'] * 100
-    df_positive['Performance (%)'] = df_positive['Performance (%)'].replace(-100, np.nan)
-    df_negative['Performance (%)'] = df_negative['Performance (%)'].replace(100, np.nan)
-    df_positive['Performance (%)'] = df_positive['Performance (%)'].round(2)
-    df_negative['Performance (%)'] = df_negative['Performance (%)'].round(2)
-    mean_positive = round(df_positive['Performance (%)'].mean(), 2)
-    mean_negative = round(df_negative['Performance (%)'].mean(), 2)
 
-    context = {
-        'portfolio': [
-            [df_positive, len(df_positive), mean_positive],
-            [df_negative, len(df_negative), mean_negative],
-        ],
+def data_cleaning(df: pd.DataFrame):
+    rename_columns = {
+        'financial_instrument': 'Ticker',
+        'Financial Instrument': 'Ticker',
+        'position': 'Position',
+        'avg_price': 'Average Price',
+        'Avg Price': 'Average Price',
+        'last_price': 'Last Price',
+        'Last': 'Last Price',
+        'performance_percentage': 'Perf (%)'
     }
-    return render(request, 'performance/index.html', context)
+    df = df.rename(columns=rename_columns)
+    df['Position'] = df['Position'].astype(float)
+    df['Average Price'] = df['Average Price'].astype(float)
+    df['Last Price'] = df['Ticker'].apply(get_last_close).astype(float)
+
+    # Split into positive positions and negative positions
+    df = df.sort_values('Position', ascending=True)
+    df_positive = df.where(df['Position'] >= 0).dropna()
+    df_negative = df.where(df['Position'] < 0).dropna()
+
+    # Sort by ticker
+    df_positive = df_positive.sort_values('Ticker', ascending=True)
+    df_negative = df_negative.sort_values('Ticker', ascending=True)
+
+    # Calculate performance percentage
+    for df in [df_positive, df_negative]:
+        df['Perf (%)'] = 0
+        if df.empty:
+            continue
+        df['Perf (%)'] = (df['Last Price'] - df['Average Price']) / df['Average Price'] * 100
+        df['Perf (%)'] = df['Perf (%)'].round(2)
+
+    df_negative['Perf (%)'] = -df_negative['Perf (%)']
+
+    # Calculate mean performance percentage
+    mean_positive = get_mean_performance(df_positive)
+    mean_negative = -get_mean_performance(df_negative)
+
+    # Sort performance
+    df_positive = df_positive.sort_values('Perf (%)', ascending=False)
+    df_negative = df_negative.sort_values('Perf (%)', ascending=False)
+
+    return df_positive, df_negative, mean_positive, mean_negative
 
 
 def get_last_close(ticker: str) -> float:
@@ -166,7 +339,7 @@ def get_last_close(ticker: str) -> float:
         return 0.0
 
     stock = stock.first()
-    candlesticks = CandleStick.objects.filter(stock=stock, date__gte=today-dt.timedelta(days=30), date__lte=today)
+    candlesticks = CandleStick.objects.filter(stock=stock, date__gte=today - dt.timedelta(days=30), date__lte=today)
     if not candlesticks:
         return 0.0
 
@@ -178,3 +351,12 @@ def get_last_close(ticker: str) -> float:
 
     value = candlesticks.last().adj_close
     return round(value, 2) if value else 0.0
+
+
+def get_mean_performance(portfolio: pd.DataFrame) -> float:
+    """It will create columns: 'Cost' and 'Profit'"""
+    portfolio['Cost'] = portfolio['Position'] * portfolio['Average Price']
+    portfolio['Profit'] = portfolio['Last Price'] * portfolio['Position'] - portfolio['Cost']
+    mean = portfolio['Profit'].sum() / portfolio['Cost'].sum() * 100
+
+    return round(mean, 2)

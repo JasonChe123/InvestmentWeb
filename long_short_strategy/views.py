@@ -13,6 +13,8 @@ import logging
 import numpy as np
 import pandas as pd
 import re
+
+from numpy.ma.core import filled
 from tqdm import tqdm
 from typing import Tuple
 from .models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
@@ -50,6 +52,7 @@ class BackTestView(View):
         self.sectors.sort()
         self.backtest_years = [1.5, 1]
         self.pos_hold = [50, 40, 30, 20, 10]
+        self.min_stock_price = [1, 2, 3, 4, 5, 10]
         self.re_balancing_months = [
             'Jan, Apr, Jul, Oct',
             'Feb, May, Aug, Nov',
@@ -66,6 +69,7 @@ class BackTestView(View):
             'sectors': self.sectors,
             'backtest_years': self.backtest_years,
             'pos_hold': self.pos_hold,
+            'min_stock_price': self.min_stock_price,
             're_balancing_months': self.re_balancing_months
         }
 
@@ -75,6 +79,7 @@ class BackTestView(View):
         self.html_context['selected_ipo_years'] = 1
         self.html_context['selected_backtest_years'] = 1.5
         self.html_context['selected_pos_hold'] = 20
+        self.html_context['selected_min_stock_price'] = 10
         self.html_context['selected_re_balancing_months'] = self.re_balancing_months[1]
         self.html_context['selected_ranking_method'] = 'Descending'
         self.html_context['csrf_token'] = csrf(request)['csrf_token']
@@ -89,6 +94,7 @@ class BackTestView(View):
         sector = request.POST.get('sectors')
         backtest_years = float(request.POST.get('backtest_years'))
         pos_hold = int(request.POST.get('pos_hold'))
+        min_stock_price = float(request.POST.get('min_stock_price'))
         re_balancing_months = request.POST.get('re_balancing_months')
         ranking_method = request.POST.get('ranking_method')
 
@@ -99,6 +105,7 @@ class BackTestView(View):
         self.html_context['selected_sectors'] = sector
         self.html_context['selected_backtest_years'] = backtest_years
         self.html_context['selected_pos_hold'] = pos_hold
+        self.html_context['selected_min_stock_price'] = min_stock_price
         self.html_context['selected_re_balancing_months'] = re_balancing_months
         self.html_context['selected_ranking_method'] = ranking_method
 
@@ -132,7 +139,7 @@ class BackTestView(View):
         result_subset = rank_and_split(results, ranking_method)
 
         # Get performance for each re-balancing date
-        df_top, df_bottom = get_performance(result_subset, method, pos_hold)
+        df_top, df_bottom = get_performance(result_subset, method, pos_hold, min_stock_price)
         if df_top.empty or df_bottom.empty:
             messages.warning(request, "No financial data available, please adjust your filter.")
 
@@ -395,7 +402,8 @@ def rank_and_split(results: pd.DataFrame, ranking_method: str) -> dict:
     return result_subset
 
 
-def get_performance(result_subset: dict, method: str, pos_hold: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def get_performance(result_subset: dict, method: str, pos_hold: int, min_stock_price: float) -> Tuple[
+    pd.DataFrame, pd.DataFrame]:
     # Setup from_month
     this_month = f"result-{dt.date.strftime(dt.date.today(), '%b %y')}"
     l_from_months = list(result_subset.keys())
@@ -441,7 +449,7 @@ def get_performance(result_subset: dict, method: str, pos_hold: int) -> Tuple[pd
                 price_from = 0.0
                 price_to = 0.0
 
-            if price_from < 10:
+            if price_from < min_stock_price:
                 # Avoid stocks with too low price, too risky
                 logging.warning(f"Ticker: {row['Ticker']}: Price is too low: ({price_from}) "
                                 f"on {candlesticks.first().date.strftime('%Y-%m-%d')}, skip it.")
@@ -507,9 +515,16 @@ def export_csv(request):
         file = request.FILES['file']
     try:
         df_portfolio = pd.read_csv(file)
+        # df_portfolio = pd.read_csv(file, skip_blank_lines=True).dropna()
         df_portfolio = df_portfolio[['Financial Instrument', 'Position']]
         df_portfolio['Financial Instrument'] = df_portfolio['Financial Instrument'].str.split(' ').str[0]
-        replace_position = {'K': 1000, 'M': 1000000, "'": "", ",": ""}
+        replace_position = {
+            'K': 1000,
+            'M': 1000000,
+            "'": "",
+            ",": ""
+        }
+        df_portfolio['Position'] = df_portfolio['Position'].replace(np.nan, 0)
         df_portfolio['Position'] = df_portfolio['Position'].replace(replace_position, regex=True).astype(int)
         df_portfolio.rename(columns={'Financial Instrument': 'Ticker', 'Position': 'Existing Position'}, inplace=True)
     except Exception as e:
@@ -545,17 +560,18 @@ def export_csv(request):
     )
 
     # Assign position for each stock
-    df_top_stocks['Expected Position'] = df_top_stocks['Amount(USD)'] // df_top_stocks['Previous Adj Close']
-    df_bottom_stocks['Expected Position'] = df_bottom_stocks['Amount(USD)'] // -df_bottom_stocks['Previous Adj Close']
+    df_top_stocks['Expected Position'] = df_top_stocks['Amount(USD)'] / df_top_stocks['Previous Adj Close']
+    df_bottom_stocks['Expected Position'] = df_bottom_stocks['Amount(USD)'] / -df_bottom_stocks['Previous Adj Close']
 
     # Calculate execute position
     df_execute = pd.concat([df_top_stocks, df_bottom_stocks], ignore_index=True)
     df_execute = pd.merge(df_execute, df_portfolio, on='Ticker', how='outer')
-
-    df_execute['Existing Position'] = df_execute['Existing Position'].fillna(0)
-    df_execute['Expected Position'] = df_execute['Expected Position'].fillna(0)
-    df_execute['Execute Position'] = df_execute['Expected Position'].astype(int) - df_execute['Existing Position']
+    df_execute['Existing Position'] = df_execute['Existing Position'].infer_objects(copy=False).fillna(0)
+    df_execute['Expected Position'] = df_execute['Expected Position'].infer_objects(copy=False).fillna(0)
+    df_execute['Execute Position'] = df_execute['Expected Position'].astype(float) - df_execute['Existing Position']
+    df_execute['Execute Position'] = df_execute['Execute Position'].round(2)
     df_execute = df_execute[['Ticker', 'Execute Position']]
+    df_execute = df_execute[df_execute['Execute Position'] != 0]
 
     # Create basket trader dataframe
     basket_trader_cols = ['Action', 'Quantity', 'Symbol', 'SecType', 'Exchange', 'Currency', 'TimeInForce',

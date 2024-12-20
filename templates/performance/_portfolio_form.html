@@ -1,0 +1,85 @@
+<!-- Portfolio name -->
+<label for="input-portfolio-name">Portfolio Name</label>
+<input class="form-control" id="input-portfolio-name" placeholder="" name="portfolio_name"
+       data-toggle="tooltip-portfolio-name" data-placement="top" title="Please enter a portfolio name"
+       required>
+<div id="portfolio-name-error" class="text-danger mb-3" style="display: none;">This portfolio name already
+    exists.
+</div>
+<div id="portfolio-name-empty" class="text-danger mb-3" style="display: none;">Portfolio name cannot be empty.
+</div>
+
+<!-- File uploader -->
+<div class="file-input-wrapper position-relative">
+    <input class="form-control mt-3" type="file" id="input-file" name="portfolio_file" accept=".csv" required
+           title="The file must be in .csv format">
+    <button type="button" class="btn-close file-clear-btn" aria-label="Close" style="display: none;"></button>
+</div>
+<div id="file-type-error" class="text-danger" style="display: none;">The file type must be csv</div>
+
+<style>
+    .file-input-wrapper {
+        position: relative;
+    }
+    .file-clear-btn {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 10;
+        background-color: transparent;
+        border: none;
+        cursor: pointer;
+    }
+    /* Hide the default file input button */
+    .file-input-wrapper input[type="file"]::-webkit-file-upload-button {
+        visibility: hidden;
+    }
+    .file-input-wrapper input[type="file"]::before {
+        content: 'Choose file';
+        display: inline-block;
+        background: linear-gradient(top, #f9f9f9, #e3e3e3);
+        border: 1px solid #999;
+        border-radius: 3px;
+        padding: 5px 8px;
+        outline: none;
+        white-space: nowrap;
+        cursor: pointer;
+        text-shadow: 1px 1px #fff;
+        font-weight: 700;
+        font-size: 10pt;
+    }
+    .file-input-wrapper input[type="file"]:hover::before {
+        border-color: black;
+    }
+    .file-input-wrapper input[type="file"]:active::before {
+        background: -webkit-linear-gradient(top, #e3e3e3, #f9f9f9);
+    }
+</style>
+
+<script>
+    $(document).ready(function() {
+        const inputFile = $('#input-file');
+        const clearBtn = $('.file-clear-btn');
+        const wrapper = $('.file-input-wrapper');
+
+        inputFile.on('change', function() {
+            if (this.files.length > 0) {
+                clearBtn.show();
+                wrapper.addClass('file-selected');
+            } else {
+                clearBtn.hide();
+                wrapper.removeClass('file-selected');
+            }
+        });
+
+        clearBtn.on('click', function(e) {
+            e.preventDefault();
+            inputFile.val('');
+            clearBtn.hide();
+            wrapper.removeClass('file-selected');
+            // Trigger the change event to update any other logic that depends on file selection
+            inputFile.trigger('change');
+        });
+    });
+</script>

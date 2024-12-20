@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Performance
+from .models import Portfolio
 
 
-admin.site.register(Performance)
+admin.site.register(Portfolio)

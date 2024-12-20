@@ -1,18 +1,17 @@
 {% extends 'base.html' %}
 {% load static %}
-
 {% block title %}Long Short{% endblock title %}
 
 {% block content %}
 <div>
     <!-- Modal (export basket trader) -->
-    <div class="modal fade" id="basketTraderModal" tabindex="-1" aria-labelledby="basketTraderModalLabel"
+    <div class="modal fade" id="basket-trader-modal" tabindex="-1" aria-labelledby="basket-trader-modal-label"
          aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <!-- Header -->
                 <div class="modal-header">
-                    <h1 class="modal-title fs-5" id="basketTraderModalLabel">Basket Trader Setting</h1>
+                    <h1 class="modal-title fs-5" id="basket-trader-modal-label">Basket Trader Setting</h1>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
@@ -20,15 +19,16 @@
                 <div class="modal-body">
                     <!-- Amount input-->
                     <div class="form-floating mb-4">
-                        <input type="number" class="form-control" id="amount" placeholder=1000 min=1000>
-                        <label for="amount">Total Amount - USD</label>
+                        <input type="number" class="form-control" id="input-amount" placeholder=1000 min=1000
+                               step="1000">
+                        <label for="input-amount">Total Amount - USD</label>
                         <small>The amount allocated for this strategy.</small>
                     </div>
 
                     <!-- File uploader -->
                     <div class="mb-4">
-                        <label for="formFile" class="form-label">( Optional ) Upload Existing Portfolio (.csv)</label>
-                        <input class="form-control" type="file" id="formFile" accept=".csv"
+                        <label for="file-input" class="form-label">( Optional ) Upload Existing Portfolio (.csv)</label>
+                        <input class="form-control" type="file" id="file-input" accept=".csv"
                                title="The file must be in .csv format">
                         <small>From IB Trader WorkStation>Portfolio>right click>Import/Export>Export Page
                             Content</small>
@@ -37,10 +37,10 @@
 
                 <!-- Footer -->
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="close_button">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="close-button">
                         Close
                     </button>
-                    <button type="button" class="btn btn-primary" disabled id="export_button">Export
+                    <button type="button" class="btn btn-primary" id="export-button" disabled>Export
                     </button>
                 </div>
             </div>
@@ -48,14 +48,14 @@
     </div>
 
     <!-- Modal (important information) -->
-    <div class="modal fade" id="messageModal" tabindex="-1" role="dialog" aria-labelledby="messageModalLabel"
+    <div class="modal fade" id="message-modal" tabindex="-1" role="dialog" aria-labelledby="message-modal-label"
          aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title text-danger" id="messageModalLabel">Important Information</h5>
+                    <h5 class="modal-title text-danger" id="message-modal-label">Important Information</h5>
                 </div>
-                <div class="modal-body" id="messageModalBody">
+                <div class="modal-body" id="message-modal-body">
                 </div>
             </div>
         </div>
@@ -211,13 +211,13 @@
                                                 </div>
                                                 <div class="card-footer">
                                                     Selected Method:<br>
-                                                    <b id="selected_method" class="py-3">
+                                                    <b id="selected-method" class="py-3">
                                                         {% if selected_method %} {{ selected_method }} {% else %} Please
                                                         select a method...
                                                         {% endif %}
                                                     </b>
-                                                    <input type="hidden" name="selected_method"
-                                                           id="selected_method_input"
+                                                    <input type="hidden" name="selected-method"
+                                                           id="selected-method-input"
                                                            {% if selected_method %} value="{{ selected_method }}"
                                                            {% else %} value="" {% endif %}>
                                                 </div>
@@ -287,7 +287,8 @@
                                                 <!-- Minimum stock price -->
                                                 <div class="form-group col-md-2 my-1 align-self-end">
                                                     <label for="min_stock_price">Min Stock Price</label>
-                                                    <select id="min_stock_price" name="min_stock_price" class="form-control">
+                                                    <select id="min_stock_price" name="min_stock_price"
+                                                            class="form-control">
                                                         {% for p in min_stock_price %}
                                                         {% if p == selected_min_stock_price %}
                                                         <option selected>{{ p }}</option>
@@ -333,7 +334,7 @@
 
                                     <!-- Submit button -->
                                     <div class="col-md-1">
-                                        <button id="startBtn" type="submit" class="btn btn-primary col-md-12">Start
+                                        <button id="start-button" type="submit" class="btn btn-primary col-md-12">Start
                                         </button>
                                     </div>
                                 </form>
@@ -378,9 +379,9 @@
                         )
                     </p>
                     <!-- Used to toggle collapse area of backtest parameters -->
-                    {% if long_total %}<input type="hidden" id="long_total" value="{{long_total}}">{% endif %}
+                    {% if long_total %}<input type="hidden" id="long-total" value="{{long_total}}">{% endif %}
                     <div class="table-responsive">
-                        <table class="table table-sm table-striped" id="table_top">
+                        <table class="table table-sm table-striped" id="table-top">
                             <!-- Header -->
                             <tr>
                                 {% for col in df_top.columns %}
@@ -412,7 +413,7 @@
                         )
                     </p>
                     <div class="table-responsive">
-                        <table class="table table-sm table-striped" id="table_bottom">
+                        <table class="table table-sm table-striped" id="table-bottom">
                             <!-- Header -->
                             <tr>
                                 {% for col in df_bottom.columns %}
@@ -434,7 +435,8 @@
 
                 <!-- Export button -->
                 <div class="row mt-3 p-3">
-                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#basketTraderModal">
+                    <button class="btn btn-outline-primary" data-bs-toggle="modal"
+                            data-bs-target="#basket-trader-modal">
                         Export Basket Trading File for IB Trader WorkStation
                     </button>
                 </div>
@@ -447,5 +449,6 @@
 </div>
 
 <!-- Script -->
-<script src="{% static 'js/longshort.js' %}"></script>
+<script src="{% static 'js/longshort/longshort.js' %}" id="longshort-js" csrf_token="{{ csrf_token }}"></script>
+
 {% endblock content %}

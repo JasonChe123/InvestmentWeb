@@ -1,8 +1,10 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load humanize %}
 {% block title %}Performance{% endblock title %}
 
 {% block content %}
+
 <!-- Modal (loading) -->
 {% include 'partials/_loading_modal.html' %}
 
@@ -48,7 +50,7 @@
 
     <!-- Details of portfolio -->
     <div class="row">
-        <!-- Summary for positive position -->
+        <!-- Positive position -->
         <div class="col-sm-6 p-3">
             <!-- Header -->
             <h6><i>Positive Position ({{ data.positive.no_of_stocks }} stocks)</i></h6>
@@ -111,7 +113,7 @@
             </div>
         </div>
 
-        <!-- Summary for negative position -->
+        <!-- Negative position -->
         <div class="col-sm-6 p-3">
             <!-- Header -->
             <h6 class="text-danger"><i>Negative Position ({{ data.negative.no_of_stocks }} stocks)</i></h6>
@@ -208,120 +210,17 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <!-- Portfolio name -->
-                <label for="input-portfolio-name">Portfolio Name</label>
-                <input class="form-control" id="input-portfolio-name" placeholder="" name="portfolio_name"
-                       data-toggle="tooltip-portfolio-name" data-placement="top" title="Please enter a portfolio name"
-                       required>
-                <div id="portfolio-name-error" class="text-danger mb-3" style="display: none;">
-                    This portfolio name already exists.
-                </div>
-
-                <!-- File uploader -->
-                <input class="form-control my-3" type="file" id="form-file" name="portfolio_file" accept=".csv"
-                       title="The file must be in .csv format">
+                {% include 'performance/_portfolio_form.html' %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="confirm-edit">Apply</button>
+                <button type="button" class="btn btn-primary" id="button-apply" disabled>Apply</button>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-    $(document).ready(function () {
-        const loadingModal = new bootstrap.Modal($('#loadingModal'));
-        var portfolioToDelete = null;
-        var portfolioToEdit = null;
+<!-- Script -->
+<script src="{% static 'js/performance/performance.js' %}" id="performance-js" csrf_token="{{ csrf_token }}"></script>
 
-        // Event handler for delete buttons
-        $('button[name="delete"]').each(function () {
-            $(this).click(function () {
-                portfolioToDelete = $(this).val();
-
-                // Show confirmation modal
-                $('#confirmation-modal').modal('show');
-            });
-        });
-
-        // Event handler for confirmation modal buttons
-        $('#confirm-delete').click(function () {
-            if (portfolioToDelete) {
-                $.ajax({
-                    url: "{% url 'delete_portfolio' %}",
-                    type: "POST",
-                    data: JSON.stringify({
-                        portfolio_name: portfolioToDelete
-                    }),
-                    contentType: "application/json",
-                    dataType: "json",
-                    headers: {
-                        "X-CSRFToken": "{{ csrf_token }}"
-                    },
-                    success: function (response) {
-                        if (response.status === "success") {
-                            location.reload();
-                        } else {
-                            alert("Error deleting portfolio: " + response.message);
-                        }
-                    },
-                    error: function (xhr, status, error) {
-                        console.error("Error deleting portfolio:", error);
-                        alert("An error occurred while deleting the portfolio.");
-                    }
-                });
-            }
-            $('#confirmation-modal').modal('hide');
-        });
-
-        // Event handler for edit buttons
-        $('button[name="edit"]').each(function () {
-            $(this).click(function () {
-                portfolioToEdit = this.value;
-
-                // Show confirmation modal
-                $('#edit-portfolio-modal').modal('show');
-            });
-        });
-
-        // Event handler for edit portfolio modal buttons
-        $('#confirm-edit').click(function () {
-            var inputPortfolioName = document.querySelector('#input-portfolio-name');
-            var fileInput = document.querySelector('#form-file');
-            var formData = new FormData();
-
-            // Add file and portfolio_name
-            if (fileInput.files.length > 0) {
-                formData.append('portfolio_file', fileInput.files[0]);
-            } else {
-                formData.append('portfolio_file', false);
-            }
-            formData.append('portfolio_name', portfolioToEdit);
-            formData.append('new_portfolio_name', inputPortfolioName.value);
-
-            // POST request
-            $('#edit-portfolio-modal').modal('hide');
-            loadingModal.show();
-            $.ajax({
-                url: "{% url 'edit_portfolio' %}",
-                type: "POST",
-                headers: {
-                    "X-CSRFToken": "{{ csrf_token }}"
-                },
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function (response) {
-                    location.reload();
-                },
-                error: function (xhr, status, error) {
-                    console.error("Error editing portfolio: ", error);
-                    alert("An error occurred while editing the portfolio.");
-                    location.reload();
-                }
-            });
-        });
-    });
-</script>
 {% endblock content %}

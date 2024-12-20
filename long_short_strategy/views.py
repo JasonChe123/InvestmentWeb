@@ -1,4 +1,5 @@
 import csv
+import pdb
 from calendar import monthrange
 import datetime as dt
 from django.contrib import messages
@@ -14,6 +15,7 @@ import numpy as np
 import pandas as pd
 import re
 
+from django.views.decorators.http import require_POST
 from numpy.ma.core import filled
 from tqdm import tqdm
 from typing import Tuple
@@ -46,7 +48,7 @@ class BackTestView(View):
 
         # # Initialize other parameters
         self.ipo_years = [5, 4, 3, 2, 1]
-        self.sectors = ['Basic Materials', 'Technology', 'Industrials', 'Health Care', 'Energy',
+        self.sectors = ['All', 'Basic Materials', 'Technology', 'Industrials', 'Health Care', 'Energy',
                         'Consumer Discretionary', 'Real Estate', 'Miscellaneous', 'Telecommunications',
                         'Consumer Staples', 'Utilities', 'Finance']
         self.sectors.sort()
@@ -77,6 +79,7 @@ class BackTestView(View):
         # Default parameters
         self.html_context['selected_market_cap'] = list(self.market_cap.keys())[:-1]
         self.html_context['selected_ipo_years'] = 1
+        self.html_context['selected_sectors'] = self.sectors[1]
         self.html_context['selected_backtest_years'] = 1.5
         self.html_context['selected_pos_hold'] = 20
         self.html_context['selected_min_stock_price'] = 10
@@ -89,7 +92,7 @@ class BackTestView(View):
     def post(self, request):
         # Get user's parameters
         market_cap = request.POST.getlist('market_cap')
-        method = request.POST.get('selected_method').rstrip("+-*/")
+        method = request.POST.get('selected-method').rstrip("+-*/")
         ipo_years = int(request.POST.get('ipo_years'))
         sector = request.POST.get('sectors')
         backtest_years = float(request.POST.get('backtest_years'))
@@ -367,27 +370,27 @@ def apply_formula(df: pd.DataFrame, formula: str, result_col_name: str) -> pd.Da
     return df
 
 
+@require_POST
 def search_method(request):
     """
     Search the method in Income Statement, Balance Sheet and Cash Flow, and return to the front-end.
     :param request: Request
     :return: {result: [method1, method2, ...]}
     """
-    if request.method == 'POST':
-        search_str = json.loads(request.body).get('search_text')
-        if search_str.strip() == '':
-            return JsonResponse({'result': []})
+    search_str = json.loads(request.body).get('search_text')
+    if search_str.strip() == '':
+        return JsonResponse({'result': []})
 
-        fields_financials = [separate_words(field.name) for field in FinancialReport._meta.get_fields() if
-                             field.concrete and field.name not in ('id', 'stock', 'date')]
-        fields_balancesheet = [separate_words(field.name) for field in BalanceSheet._meta.get_fields() if
-                               field.concrete and field.name not in ('id', 'stock', 'date')]
-        fields_cashflow = [separate_words(field.name) for field in CashFlow._meta.get_fields() if
+    fields_financials = [separate_words(field.name) for field in FinancialReport._meta.get_fields() if
+                         field.concrete and field.name not in ('id', 'stock', 'date')]
+    fields_balancesheet = [separate_words(field.name) for field in BalanceSheet._meta.get_fields() if
                            field.concrete and field.name not in ('id', 'stock', 'date')]
-        all_fields = fields_financials + fields_balancesheet + fields_cashflow
-        results = [method for method in all_fields if search_str.lower() in method.lower()]
+    fields_cashflow = [separate_words(field.name) for field in CashFlow._meta.get_fields() if
+                       field.concrete and field.name not in ('id', 'stock', 'date')]
+    all_fields = fields_financials + fields_balancesheet + fields_cashflow
+    results = [method for method in all_fields if search_str.lower() in method.lower()]
 
-        return JsonResponse({'result': results})
+    return JsonResponse({'result': results})
 
 
 def rank_and_split(results: pd.DataFrame, ranking_method: str) -> dict:
@@ -405,9 +408,10 @@ def rank_and_split(results: pd.DataFrame, ranking_method: str) -> dict:
 def get_performance(result_subset: dict, method: str, pos_hold: int, min_stock_price: float) -> Tuple[
     pd.DataFrame, pd.DataFrame]:
     # Setup from_month
-    this_month = f"result-{dt.date.strftime(dt.date.today(), '%b %y')}"
+    next_month = f"result-{dt.date.strftime(dt.date.today() + dt.timedelta(days=30), '%b %y')}"
+    # this_month = f"result-{dt.date.strftime(dt.date.today(), '%b %y')}"
     l_from_months = list(result_subset.keys())
-    l_to_months = l_from_months[1:] + [this_month]
+    l_to_months = l_from_months[1:] + [next_month]
 
     # Loop through all periods
     for from_month, to_month in tqdm(zip(l_from_months, l_to_months), desc="Getting performance..."):
@@ -533,8 +537,8 @@ def export_csv(request):
 
     # Get top and bottom stocks from backtest
     data = json.loads(request.POST['table_data'])
-    df_top_stocks = pd.DataFrame(columns=data['table_top'][0], data=data['table_top'][1:])
-    df_bottom_stocks = pd.DataFrame(columns=data['table_bottom'][0], data=data['table_bottom'][1:])
+    df_top_stocks = pd.DataFrame(columns=data['long_table'][0], data=data['long_table'][1:])
+    df_bottom_stocks = pd.DataFrame(columns=data['short_table'][0], data=data['short_table'][1:])
 
     # Ignore the last row (row for total) and extract the last 3 columns (the latest re-balancing period)
     df_top_stocks = df_top_stocks.iloc[:-1, -3:]

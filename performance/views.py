@@ -9,9 +9,10 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST, require_GET
 import json
 import logging
+import numpy as np
 import pandas as pd
 from long_short_strategy.models import Stock, CandleStick
-from .models import Performance
+from .models import Portfolio
 
 
 @login_required
@@ -33,18 +34,18 @@ def home(request):
     #                  }, ...],
     # 'group_name': [{...}, {...}, ...]
     # }
-    for perf in portfolio:
+    for port in portfolio:
         # Create group
-        if perf.group_name not in grouped_portfolio:
-            grouped_portfolio[perf.group_name] = []
+        if port.group_name not in grouped_portfolio:
+            grouped_portfolio[port.group_name] = []
 
         # Append data
-        grouped_portfolio[perf.group_name].append({
-            'financial_instrument': perf.financial_instrument,
-            'position': perf.position,
-            'avg_price': perf.avg_price,
-            'last_price': perf.last_price,
-            'performance_percentage': perf.performance_percentage,
+        grouped_portfolio[port.group_name].append({
+            'financial_instrument': port.financial_instrument,
+            'position': port.position,
+            'avg_price': port.avg_price,
+            'last_price': port.last_price,
+            'exit_price': port.exit_price,
         })
 
     # Prepare context
@@ -55,11 +56,13 @@ def home(request):
         df_negative['Cost'] = abs(df_negative['Cost'])
         init_cost_positive = int(df_positive['Cost'].sum())
         init_cost_negative = int(df_negative['Cost'].sum())
+        df_positive = df_positive.replace(np.nan, "")
+        df_negative = df_negative.replace(np.nan, "")
 
         # Append to processed portfolio
         processed_portfolio.append({
             'group_name': group_name,
-            'created': dt.datetime.strftime(perf.created_at, '%d %b %Y'),
+            'created': dt.datetime.strftime(port.created_at, '%d %b %Y'),
             'last_update': None,
             'positive': {
                 'df': df_positive,
@@ -94,7 +97,7 @@ def add_portfolio(request):
 @require_POST
 def check_portfolio_name(request):
     portfolio_name = request.POST.get('portfolio_name', '')
-    exists = Performance.objects.filter(user=request.user, group_name=portfolio_name).exists()
+    exists = Portfolio.objects.filter(user=request.user, group_name=portfolio_name).exists()
     return JsonResponse({'exists': exists})
 
 
@@ -111,24 +114,36 @@ def save_portfolio(request):
 
         with transaction.atomic():
             # Delete existing data for this user's portfolio
-            Performance.objects.filter(user=request.user, group_name=portfolio_name).delete()
+            Portfolio.objects.filter(user=request.user, group_name=portfolio_name).delete()
 
             # Save new records
             performance_data = []
             for df in [portfolio_positive, portfolio_negative]:
                 for _, row in df.iterrows():
-                    performance_data.append(
-                        Performance(
-                            user=request.user,
-                            group_name=portfolio_name,
-                            financial_instrument=row['Ticker'],
-                            position=row['Position'],
-                            avg_price=row['Average Price'],
-                            last_price=row['Last Price'],
-                            performance_percentage=row['Perf (%)']
+                    if pd.notna(row['Exit Price']):
+                        performance_data.append(
+                            Portfolio(
+                                user=request.user,
+                                group_name=portfolio_name,
+                                financial_instrument=row['Ticker'],
+                                position=row['Position'],
+                                avg_price=row['Average Price'],
+                                last_price=row['Last Price'],
+                                exit_price=row['Exit Price'],
+                            )
                         )
-                    )
-            Performance.objects.bulk_create(performance_data)
+                    else:
+                        performance_data.append(
+                            Portfolio(
+                                user=request.user,
+                                group_name=portfolio_name,
+                                financial_instrument=row['Ticker'],
+                                position=row['Position'],
+                                avg_price=row['Average Price'],
+                                last_price=row['Last Price'],
+                            )
+                        )
+            Portfolio.objects.bulk_create(performance_data)
 
         # Django messages
         messages.success(request, "Portfolio saved successfully.")
@@ -156,7 +171,7 @@ def edit_portfolio(request):
                     messages.info(request, f"The new portfolio name '{new_portfolio_name}' is the same as the current one.")
                 else:
                     # Update portfolio name
-                    Performance.objects.filter(
+                    Portfolio.objects.filter(
                         user=request.user,
                         group_name=portfolio_name
                     ).update(group_name=new_portfolio_name)
@@ -172,25 +187,37 @@ def edit_portfolio(request):
                 portfolio_positive, portfolio_negative, _, _ = data_cleaning(portfolio)
 
                 # Delete existing data for this user's portfolio
-                Performance.objects.filter(user=request.user, group_name=portfolio_name).delete()
+                Portfolio.objects.filter(user=request.user, group_name=portfolio_name).delete()
 
                 # Save new records
                 performance_data = []
                 for df in [portfolio_positive, portfolio_negative]:
                     for _, row in df.iterrows():
-                        performance_data.append(
-                            Performance(
-                                user=request.user,
-                                group_name=portfolio_name,
-                                financial_instrument=row['Ticker'],
-                                position=row['Position'],
-                                avg_price=row['Average Price'],
-                                last_price=row['Last Price'],
-                                performance_percentage=row['Perf (%)']
+                        if pd.notna(row['Exit Price']):
+                            performance_data.append(
+                                Portfolio(
+                                    user=request.user,
+                                    group_name=portfolio_name,
+                                    financial_instrument=row['Ticker'],
+                                    position=row['Position'],
+                                    avg_price=row['Average Price'],
+                                    last_price=row['Last Price'],
+                                    exit_price=row['Exit Price'],
+                                )
                             )
-                        )
+                        else:
+                            performance_data.append(
+                                Portfolio(
+                                    user=request.user,
+                                    group_name=portfolio_name,
+                                    financial_instrument=row['Ticker'],
+                                    position=row['Position'],
+                                    avg_price=row['Average Price'],
+                                    last_price=row['Last Price'],
+                                )
+                            )
 
-                Performance.objects.bulk_create(performance_data)
+                Portfolio.objects.bulk_create(performance_data)
                 messages.success(request, f"Portfolio '{portfolio_name}' updated successfully.")
 
             return JsonResponse({'status': 'success'})
@@ -214,7 +241,7 @@ def delete_portfolio(request):
             }, status=400)
 
         # Delete the portfolio
-        deleted_count, _ = Performance.objects.filter(user=request.user, group_name=portfolio_name).delete()
+        deleted_count, _ = Portfolio.objects.filter(user=request.user, group_name=portfolio_name).delete()
 
         if deleted_count > 0:
             messages.success(request, f"Portfolio '{portfolio_name}' deleted successfully.")
@@ -242,7 +269,7 @@ def delete_portfolio(request):
 
 
 def get_portfolio(request) -> pd.DataFrame:
-    portfolio = Performance.objects.filter(user=request.user).order_by('group_name')
+    portfolio = Portfolio.objects.filter(user=request.user).order_by('group_name')
     return portfolio
 
 
@@ -264,15 +291,20 @@ def get_upload_portfolio(request) -> (str, pd.DataFrame):
         message = "The file must contain 'Financial Instrument', 'Position' and 'Avg Price' columns."
         return message, None
 
+    if 'Exit Price' not in df.columns:
+        df['Exit Price'] = np.nan
+
     # Invalid data
     replace_format = {'K': 1000, 'M': 1000000, "'": "", ",": ""}
     df['Position'] = df['Position'].replace(replace_format, regex=True)
     df['Avg Price'] = df['Avg Price'].replace(replace_format, regex=True)
+    df['Exit Price'] = df['Exit Price'].replace(replace_format, regex=True)
     try:
         df['Position'] = df['Position'].astype(float)
         df['Avg Price'] = df['Avg Price'].astype(float)
+        df['Exit Price'] = df['Exit Price'].astype(float)
     except ValueError:
-        message = "Invalid data in 'Position'/'Avg Price' column, please check the file."
+        message = "Invalid data in Position/ Avg Price/ Exit Price columns, please check the file."
         return message, None
 
     # Invalid average price
@@ -283,7 +315,7 @@ def get_upload_portfolio(request) -> (str, pd.DataFrame):
     # Extract ticker
     df['Financial Instrument'] = df['Financial Instrument'].str.split(' ').str[0]
 
-    return "", df[['Financial Instrument', 'Position', 'Avg Price']]
+    return "", df[['Financial Instrument', 'Position', 'Avg Price', 'Exit Price']]
 
 
 def data_cleaning(df: pd.DataFrame):
@@ -295,17 +327,22 @@ def data_cleaning(df: pd.DataFrame):
         'Avg Price': 'Average Price',
         'last_price': 'Last Price',
         'Last': 'Last Price',
+        'exit_price': 'Exit Price',
         'performance_percentage': 'Perf (%)'
     }
     df = df.rename(columns=rename_columns)
     df['Position'] = df['Position'].astype(float)
     df['Average Price'] = df['Average Price'].astype(float)
     df['Last Price'] = df['Ticker'].apply(get_last_close).astype(float)
+    if 'Exit Price' not in df.columns:
+        df['Exit Price'] = None
+    else:
+        df['Exit Price'] = df['Exit Price'].astype(float)
 
     # Split into positive positions and negative positions
     df = df.sort_values('Position', ascending=True)
-    df_positive = df.where(df['Position'] >= 0).dropna()
-    df_negative = df.where(df['Position'] < 0).dropna()
+    df_positive = df.where(df['Position'] >= 0).dropna(subset=['Position'])
+    df_negative = df.where(df['Position'] < 0).dropna(subset=['Position'])
 
     # Sort by ticker
     df_positive = df_positive.sort_values('Ticker', ascending=True)
@@ -316,7 +353,13 @@ def data_cleaning(df: pd.DataFrame):
         df['Perf (%)'] = 0
         if df.empty:
             continue
-        df['Perf (%)'] = (df['Last Price'] - df['Average Price']) / df['Average Price'] * 100
+
+        df['Perf (%)'] = np.where(
+            pd.notnull(df['Exit Price']) & pd.to_numeric(df['Exit Price'], errors='coerce').notnull(),
+            (df['Exit Price'] - df['Average Price']) / df['Average Price'] * 100,
+            (df['Last Price'] - df['Average Price']) / df['Average Price'] * 100
+        )
+        # df['Perf (%)'] = (df['Last Price'] - df['Average Price']) / df['Average Price'] * 100
         df['Perf (%)'] = df['Perf (%)'].round(2)
 
     df_negative['Perf (%)'] = -df_negative['Perf (%)']
@@ -356,7 +399,12 @@ def get_last_close(ticker: str) -> float:
 def get_mean_performance(portfolio: pd.DataFrame) -> float:
     """It will create columns: 'Cost' and 'Profit'"""
     portfolio['Cost'] = portfolio['Position'] * portfolio['Average Price']
-    portfolio['Profit'] = portfolio['Last Price'] * portfolio['Position'] - portfolio['Cost']
+    portfolio['Profit'] = np.where(
+        pd.notnull(portfolio['Exit Price']) & pd.to_numeric(portfolio['Exit Price'], errors='coerce').notnull(),
+        (portfolio['Exit Price'] - portfolio['Average Price']) * portfolio['Position'],
+        (portfolio['Last Price'] - portfolio['Average Price']) * portfolio['Position']
+    )
+    # portfolio['Profit'] = portfolio['Last Price'] * portfolio['Position'] - portfolio['Cost']
     mean = portfolio['Profit'].sum() / portfolio['Cost'].sum() * 100
 
     return round(mean, 2)

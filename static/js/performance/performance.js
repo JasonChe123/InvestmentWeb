@@ -2,6 +2,7 @@ $(document).ready(function () {
     // Get Elements
     const scriptTag = $('#performance-js');
     const loadingModal = new bootstrap.Modal($('#loading-modal'));
+    const backButton = $('#back-btn');
     const portfolioNameInput = $('#input-portfolio-name');
     const fileInput = $('#input-file');
     const applyButton = $('#button-apply');
@@ -76,6 +77,11 @@ $(document).ready(function () {
             uploadButton.prop('disabled', false);
         }
     }
+
+    // Back button
+    backButton.click(function () {
+        window.history.back();
+    })
 
     // Delete buttons
     $('button[name="delete"]').each(function () {

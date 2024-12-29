@@ -6,7 +6,16 @@
 <!-- Modal (loading) -->
 {% include 'partials/_loading_modal.html' %}
 
-<div class="card-body w-100 p-3 shadow p-3 mb-5 bg-white rounded">
+
+<!-- Back page -->
+<div class="my-3 text-end">
+    <button class="btn btn-primary" style="width: 100px;" id="back-btn">
+        <b><i class="fas fa-arrow-circle-left me-2"></i>Back</b>
+    </button>
+</div>
+
+
+<div class="card-body w-100 p-3 custom-shadow p-3 mb-5 rounded">
     <!-- Portfolio uploader -->
     <h4>Add a portfolio</h4>
     <p>Please upload a portfolio. You can export the csv file from
@@ -21,9 +30,7 @@
 </div>
 
 <!-- Script -->
-window.onload = function() {
 <script src="{% static 'js/performance/performance.js' %}" id="performance-js" csrf_token="{{ csrf_token }}"
         type="module"></script>
-}
 
 {% endblock content %}

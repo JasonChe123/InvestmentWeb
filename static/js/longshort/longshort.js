@@ -1,5 +1,7 @@
 $(document).ready(function () {
     // Elements
+    const allCheckbox = $('#all-sectors-checkbox');
+    const sectorCheckbox = $('.sector-checkbox');
     const startButton = $('#start-button');
     const amountInput = $('#input-amount');
     const fileInput = $('#file-input')
@@ -12,14 +14,16 @@ $(document).ready(function () {
     const searchResult = $('#search-result');
     const selectedMethod = $('#selected-method');
     const selectedMethodInput = $('#selected-method-input');
-    const longTotal = $('#long-total');
     const tables = $('table');
-    const heads = $('th');
-    const cells = $('td');
+    const heads = tables.find('th');
+    const cells = tables.find('td');
 
     // CSRF token
     const scriptTag = $('#longshort-js');
     const csrfToken = scriptTag.attr("csrf_token");
+
+    // For collapse/ expand the backtest parameters
+    const result = scriptTag.attr("result");
 
     function extractTableData(table) {
         const rows = table.rows;
@@ -68,7 +72,25 @@ $(document).ready(function () {
         exportButton.prop('disabled', amountInvalid || fileTypeInvalid);
     }
 
+    // Hide result first
     searchResult.hide();
+
+    // 'All' checkbox event
+    allCheckbox.change(function () {
+        sectorCheckbox.prop('checked', this.checked);
+    });
+
+    // 'Sector' checkbox event
+    sectorCheckbox.change(function () {
+        const allChecked = sectorCheckbox.length === sectorCheckbox.filter(':checked').length;
+        allCheckbox.prop('checked', allChecked);
+    });
+
+    // Amount input event
+    amountInput.change(validateExportButton);
+
+    // File input event
+    fileInput.change(validateExportButton);
 
     // Start button (show loading modal)
     startButton.click(function () {
@@ -80,23 +102,17 @@ $(document).ready(function () {
     for (let i = 0; i < cells.length; i++) {
         const value = parseFloat(cells[i].textContent);
         if (typeof (value) === 'number' && !isNaN(value)) cells[i].style.textAlign = 'right';
-        if (!isNaN(value) && value < 0) cells[i].style.color = 'red';
+        if (!isNaN(value) && value < 0) cells[i].classList.add("text-danger");
     }
 
-    // Format table: add border to all tables
-    for (let i = 0; i < tables.length; i++) {
-        tables[i].style.border = '1px solid #bbb';
-    }
-
-    // Format table: add left border to all ticker columns
-    for (let i = 0; i < heads.length; i++) {  // i starts from 1 because i need to ignore the first comlumn
-        if (heads[i].textContent === 'Ticker') {
-            const symbolColumnIndex = heads[i].cellIndex;
-            heads[i].style.borderLeft = '1px solid #bbb';
+    // Format table: add left border to ticker columns
+    for (let i = 0; i < heads.length; i++) {
+        if (heads[i].cellIndex % 3 === 0) {
+            heads[i].classList.add('border-start');
 
             for (let j = 0; j < cells.length; j++) {
-                if (cells[j].cellIndex === symbolColumnIndex) {
-                    cells[j].style.borderLeft = '1px solid #bbb';
+                if (cells[j].cellIndex % 3 === 0) {
+                    cells[j].classList.add('border-start');
                 }
             }
         }
@@ -217,9 +233,9 @@ $(document).ready(function () {
         });
     });
 
-    // Auto show 'Backtest Parameters'
-    if (longTotal.length === 0) {
-        $('#collapse_params_button').click();
+    // Auto expand 'Backtest Parameters'
+    if (!result) {
+        $('#collapse-params-button').click();
     }
 
     // Validate amount from basket trader
@@ -249,11 +265,19 @@ $(document).ready(function () {
     // Export basket trader
     exportButton.click(function () {
         basketTraderModal.hide();
-        loadingModal.show();
 
         // Extract table data
-        const longTableData = extractTableData($('#table-top')[0]);
-        const shortTableData = extractTableData($('#table-bottom')[0]);
+        const longTables = $('.table-top');
+        let longTableData = [];
+        for (let i = 0; i < longTables.length; i++) {
+            longTableData.push(extractTableData(longTables[i]));
+        }
+
+        const shortTables = $('.table-bottom');
+        let shortTableData = [];
+        for (let i = 0; i < shortTables.length; i++) {
+            shortTableData.push(extractTableData(shortTables[i]));
+        }
 
         // Add data to formData
         const formData = new FormData();
@@ -265,6 +289,7 @@ $(document).ready(function () {
         formData.append("amount", amountInput.val());
 
         // Send request
+        loadingModal.show();
         $.ajax({
             url: 'export-csv',
             method: 'POST',
@@ -287,10 +312,7 @@ $(document).ready(function () {
                 const blob = new Blob([response], {type: 'text/csv'});
                 $('#message-modal').on('hidden.bs.modal', function () {
                     const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'basket_trader.csv';
-                    a.click();
+                    $(`<a href="${url}" hidden download="basket_trader.csv"></a>`)[0].click()
                 });
             },
             error: function (xhr, status, error) {

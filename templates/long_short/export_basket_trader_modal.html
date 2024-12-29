@@ -1,0 +1,46 @@
+<div class="modal fade" id="basket-trader-modal" tabindex="-1" aria-labelledby="basket-trader-modal-label"
+     aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <!-- Header -->
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="basket-trader-modal-label">Basket Trader Setting</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-body">
+                <!-- Amount input-->
+                <div class="form-floating mb-4">
+                    <input type="number" class="form-control" id="input-amount" min=1000 step="1000">
+                    <label for="input-amount">Total Amount - USD</label>
+                    <small>The amount allocated for this strategy (both long and short positions).</small>
+                </div>
+
+                <!-- File uploader -->
+                <div class="mb-4">
+                    <label for="file-input" class="form-label">( Optional ) Upload Existing Portfolio (.csv)</label>
+                    <input class="form-control" type="file" id="file-input" accept=".csv"
+                           title="The file must be in .csv format">
+                    <small>
+                        If you upload your existing portfolio, it is expected to close all irrelevant positions as
+                        shown in the generated csv file. You can edit the file if necessary.<br>
+                        To export your portfolio from IB Trader WorkStation:<br>
+                        Login to IB Trader WorkStation > Portfolio > right click > Import/Export > Export Page
+                        Content<br>
+                        Please make sure 'Financial Instrument' and 'Position' appear in the 'Portfolio' page.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="close-button">
+                    Close
+                </button>
+                <button type="button" class="btn btn-primary" id="export-button" disabled>Export
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,7 +1,10 @@
 $(document).ready(function () {
     // Elements
     const allCheckbox = $('#all-sectors-checkbox');
+    const marketCapCheckbox = $('.market-cap-checkbox');
+    const marketCapCheckLabel = $('.market-cap-checklabel');
     const sectorCheckbox = $('.sector-checkbox');
+    const sectorCheckLabel = $('.sector-checklabel');
     const startButton = $('#start-button');
     const amountInput = $('#input-amount');
     const fileInput = $('#file-input')
@@ -72,6 +75,57 @@ $(document).ready(function () {
         exportButton.prop('disabled', amountInvalid || fileTypeInvalid);
     }
 
+    function updateStockNum() {
+        // Get selected market cap and sectors
+        let marketCap = [];
+        let sectors = [];
+        marketCapCheckbox.each(function () {
+            if (this.checked) marketCap.push(this.value);
+        });
+        sectorCheckbox.each(function () {
+            if (this.checked) sectors.push(this.value);
+        });
+
+        // Request update stock numbers
+        $.ajax({
+            url: 'update-stock-numbers',
+            type: 'POST',
+            headers: {
+                'X-requested-with': 'XMLHttpRequest',
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            data: JSON.stringify({
+                'market_cap': marketCap,
+                'sectors': sectors,
+            }),
+            success: function (data) {
+                // Update sectors stock numbers
+                sectorCheckLabel.each(function () {
+                    let attr = this.getAttribute('for');
+                    if (attr === 'all-sectors-checkbox') {
+                        this.innerText = `All (${data.result['All']})`;
+                    } else {
+                        this.innerText = `${attr} (${data.result[attr]})`;
+                    }
+                });
+
+                // Update market cap stock numbers
+                marketCapCheckLabel.each(function () {
+                    let attr = this.getAttribute('for');
+                    for (let key in data.result) {
+                        if (key.includes(attr)) {
+                            this.innerText = `${key} (${data.result[key]})`;
+                        }
+                    }
+                });
+            },
+            error: function (xhr, status, error) {
+                console.log(xhr.responseText);
+            }
+        })
+    }
+
     // Hide result first
     searchResult.hide();
 
@@ -84,6 +138,7 @@ $(document).ready(function () {
     sectorCheckbox.change(function () {
         const allChecked = sectorCheckbox.length === sectorCheckbox.filter(':checked').length;
         allCheckbox.prop('checked', allChecked);
+        updateStockNum();
     });
 
     // Amount input event
@@ -118,7 +173,7 @@ $(document).ready(function () {
         }
     }
 
-    // POST request: search for backtest parameters
+    // Ajax: search for backtest parameters
     searchField.keyup(function (event) {
         const search_value = event.target.value;
         $.ajax({
@@ -161,12 +216,17 @@ $(document).ready(function () {
         })
     });
 
+    // Ajax: update stock numbers
+    marketCapCheckbox.click(function () {
+        updateStockNum();
+    });
+
     // Modify 'Selected Method' from dropdown
     $('.method-selector').change(function () {
         modifySelectedMethod(this.value);
     });
 
-    // Operator event
+    // Math operator event
     $('.operator').each(function (e) {
         $(this).click(function () {
             // If the AC button was clicked
@@ -236,8 +296,8 @@ $(document).ready(function () {
     // Auto expand 'Backtest Parameters'
     if (!result) {
         $('#collapse-params-button').click();
+        updateStockNum();
     }
-
     // Validate amount from basket trader
     amountInput.on("input change blur", function (event) {
         const value = event.target.value.trim();

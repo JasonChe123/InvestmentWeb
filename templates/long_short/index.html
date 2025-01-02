@@ -36,6 +36,44 @@
                 re-balancing date)
             </li>
         </ul>
+
+        <div class="w-100 d-inline-flex gap-3">
+            <!-- Summary -->
+            <table class="table table-sm table-bordered w-75 custom-shadow">
+                <!-- Header -->
+                <tr>
+                    <th></th>
+                    <th class="text-center">Long Perf(%)</th>
+                    <th class="text-center">Short Perf(%)</th>
+                    <th class="text-center">Total Perf(%)</th>
+                    <th class="text-center">Annualized Perf(%)</th>
+                </tr>
+                <!-- Data -->
+                {% for d in data %}
+                <tr>
+                    <th>{{ d.sector }}</th>
+                    <td>{{ d.long_total }}%</td>
+                    <td>{{ d.short_total }}%</td>
+                    <td>{{ d.longshort_total }}%</td>
+                    <td>{{ d.longshort_annualized }}%</td>
+                </tr>
+                {% endfor %}
+                <tr class="bg-primary-subtle">
+                    <th class="bg-primary-subtle">Total</th>
+                    <td class="bg-primary-subtle">{{ long_total }}</td>
+                    <td class="bg-primary-subtle">{{ short_total }}</td>
+                    <td class="bg-primary-subtle">{{ longshort_total }}</td>
+                    <td class="bg-primary-subtle">{{ longshort_annualized }}</td>
+                </tr>
+            </table>
+
+            <!-- Export button -->
+            <button class="btn btn-outline-primary h-50"
+                    data-bs-toggle="modal"
+                    data-bs-target="#basket-trader-modal">
+                Export Basket Trading File for IB Trader WorkStation
+            </button>
+        </div>
     </div>
 
     <!-- Result by sector -->
@@ -60,14 +98,14 @@
             </ul>
 
             <!-- Content -->
-            <div class="tab-content" id="sectorTabsContent">
+            <div class="tab-content custom-shadow" id="sectorTabsContent">
                 {% for d in data %}
                 <div class="tab-pane fade {% if forloop.first %}show active{% endif %}"
                      id="content-{{ d.sector|slugify }}"
                      role="tabpanel"
                      aria-labelledby="tab-{{ d.sector|slugify }}">
                     <div class="p-3 mb-5">
-                        <h5 class="mb-3">Sector - {{ d.sector }} ( annul. {{ d.annu_return }}% )</h5>
+                        <h5 class="mb-3">Sector - {{ d.sector }}</h5>
 
                         <!-- Top stocks -->
                         <div class="row">
@@ -151,113 +189,6 @@
                     </div>
                 </div>
                 {% endfor %}
-            </div>
-
-
-            <!--            {% for d in data %}-->
-            <!--            <div class="rounded-3 p-3 mb-5 custom-shadow">-->
-            <!--                <h5 class="mb-3">Sector - {{ d.sector }} ( annul. {{ d.annu_return }}% )</h5>-->
-
-            <!--                &lt;!&ndash; Top stocks &ndash;&gt;-->
-            <!--                <div class="row">-->
-            <!--                    <label>-->
-            <!--                        Top {{ selected_pos_hold }} Stocks (Total Performance-->
-            <!--                        {% if d.long_total < 0 %}-->
-            <!--                        <b style="color: red">{{ d.long_total }}</b>-->
-            <!--                        {% else %}-->
-            <!--                        <b>{{ d.long_total }}</b>-->
-            <!--                        {% endif %}-->
-            <!--                        )-->
-            <!--                    </label>-->
-            <!--                    {% if d.long_total %}<input type="hidden" id="long-total" value="{{ long_total }}">{% endif %}-->
-            <!--                    <div class="table-responsive">-->
-            <!--                        <table class="table table-sm table-striped table-borderless border" id="table-top">-->
-            <!--                            &lt;!&ndash; Header &ndash;&gt;-->
-            <!--                            <tr>-->
-            <!--                                &lt;!&ndash; Period &ndash;&gt;-->
-            <!--                                {% for col in d.df_top.columns %}-->
-            <!--                                {% if col != 'Ticker' and col != 'Perf(%)'%}-->
-            <!--                                <th colspan="3" class="text-center border-start border-end">{{ col }}</th>-->
-            <!--                                {% endif %}-->
-            <!--                                {% endfor %}-->
-            <!--                            </tr>-->
-            <!--                            <tr>-->
-            <!--                                &lt;!&ndash; Ticker, Value, Perf(%) &ndash;&gt;-->
-            <!--                                {% for col in d.df_top.columns %}-->
-            <!--                                {% if col != 'Ticker' and col != 'Perf(%)'%}-->
-            <!--                                <th class="text-center border-bottom">Value</th>-->
-            <!--                                {% else %}-->
-            <!--                                <th class="text-center border-bottom">{{ col }}</th>-->
-            <!--                                {% endif %}-->
-            <!--                                {% endfor %}-->
-            <!--                            </tr>-->
-
-            <!--                            &lt;!&ndash; Data &ndash;&gt;-->
-            <!--                            {% for i, row in d.df_top.iterrows %}-->
-            <!--                            <tr>-->
-            <!--                                {% for cell in row %}-->
-            <!--                                <td>{{ cell }}</td>-->
-            <!--                                {% endfor %}-->
-            <!--                            </tr>-->
-            <!--                            {% endfor %}-->
-            <!--                        </table>-->
-            <!--                    </div>-->
-            <!--                </div>-->
-
-            <!--                &lt;!&ndash; Bottom stocks &ndash;&gt;-->
-            <!--                <div class="row">-->
-            <!--                    <label>-->
-            <!--                        Bottom {{ selected_pos_hold }} Stocks (Total Performance-->
-            <!--                        {% if d.short_total < 0%}-->
-            <!--                        <b style="color: red;">{{ d.short_total }}</b>-->
-            <!--                        {% else %}-->
-            <!--                        <b>{{ d.short_total }}</b>-->
-            <!--                        {% endif %}-->
-            <!--                        )-->
-            <!--                    </label>-->
-            <!--                    {% if d.short_total %}<input type="hidden" id="short-total" value="{{ short_total }}">{% endif %}-->
-            <!--                    <div class="table-responsive">-->
-            <!--                        <table class="table table-sm table-striped table-borderless border" id="table-bottom">-->
-            <!--                            &lt;!&ndash; Header &ndash;&gt;-->
-            <!--                            <tr>-->
-            <!--                                &lt;!&ndash; Period &ndash;&gt;-->
-            <!--                                {% for col in d.df_bottom.columns %}-->
-            <!--                                {% if col != 'Ticker' and col != 'Perf(%)'%}-->
-            <!--                                <th colspan="3" class="text-center border-start border-end">{{ col }}</th>-->
-            <!--                                {% endif %}-->
-            <!--                                {% endfor %}-->
-            <!--                            </tr>-->
-            <!--                            <tr>-->
-            <!--                                &lt;!&ndash; Ticker, Value, Perf(%) &ndash;&gt;-->
-            <!--                                {% for col in d.df_bottom.columns %}-->
-            <!--                                {% if col != 'Ticker' and col != 'Perf(%)'%}-->
-            <!--                                <th class="text-center border-bottom">Value</th>-->
-            <!--                                {% else %}-->
-            <!--                                <th class="text-center border-bottom">{{ col }}</th>-->
-            <!--                                {% endif %}-->
-            <!--                                {% endfor %}-->
-            <!--                            </tr>-->
-
-            <!--                            &lt;!&ndash; Data &ndash;&gt;-->
-            <!--                            {% for i, row in d.df_bottom.iterrows %}-->
-            <!--                            <tr>-->
-            <!--                                {% for cell in row %}-->
-            <!--                                <td>{{ cell }}</td>-->
-            <!--                                {% endfor %}-->
-            <!--                            </tr>-->
-            <!--                            {% endfor %}-->
-            <!--                        </table>-->
-            <!--                    </div>-->
-            <!--                </div>-->
-            <!--            </div>-->
-            <!--            {% endfor %}-->
-
-            <!-- Export button -->
-            <div class="row mt-3 p-3">
-                <button class="btn btn-outline-primary" data-bs-toggle="modal"
-                        data-bs-target="#basket-trader-modal">
-                    Export Basket Trading File for IB Trader WorkStation
-                </button>
             </div>
         </div>
     </div>

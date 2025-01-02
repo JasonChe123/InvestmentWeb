@@ -2,12 +2,22 @@
     margin-bottom: 10px;
 }
 
-.socialaccount_providers a {
+[data-bs-theme=light] .socialaccount_providers a {
     display: block;
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
     text-decoration: none;
-    color: #333;
+    color: black;
+    transition: background-color 0.3s;
+}
+
+[data-bs-theme=dark] .socialaccount_providers a {
+    display: block;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-decoration: none;
+    color: white;
     transition: background-color 0.3s;
 }

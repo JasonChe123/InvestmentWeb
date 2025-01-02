@@ -1,14 +1,15 @@
 from calendar import monthrange
+from concurrent.futures.thread import ThreadPoolExecutor
 import csv
 import datetime as dt
 from django.contrib import messages
-from django.http import HttpResponse
 from django.db.models import Q, OuterRef, Subquery, Prefetch
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.template.context_processors import csrf
 from django.views import View
 from django.views.decorators.http import require_POST
+import functools
 import json
 import logging
 import numpy as np
@@ -23,17 +24,24 @@ import pdb
 
 market_cap = {
     'Mega (>$200B)': 200_000_000_000,
-    'Large ($10B-$200B)': range(10_000_000_000, 20_000_000_001),
+    'Large ($10B-$200B)': range(10_000_000_000, 200_000_000_001),
     'Medium ($2B-$10B)': range(2_000_000_000, 10_000_000_001),
     'Small ($300M-$2B)': range(300_000_000, 2_000_000_001),
     'Micro ($50M-$300M)': range(50_000_000, 300_000_001),
     'Nano (<$50M)': range(0, 50_000_001),
 }
+sectors = ['Basic Materials', 'Technology', 'Industrials', 'Health Care', 'Energy',
+           'Consumer Discretionary', 'Real Estate', 'Miscellaneous', 'Telecommunications',
+           'Consumer Staples', 'Utilities', 'Finance']
+sectors.sort()
 
 
 class BackTestView(View):
     def __init__(self):
         super().__init__()
+        self.long_total = 0
+        self.short_total = 0
+        self.longshort_annualized = 0
 
         # Initialize parameter: market cap
         self.market_cap = market_cap
@@ -48,13 +56,6 @@ class BackTestView(View):
 
         # # Initialize other parameters
         self.ipo_years = [5, 4, 3, 2, 1]
-        sectors = ['Basic Materials', 'Technology', 'Industrials', 'Health Care', 'Energy',
-                   'Consumer Discretionary', 'Real Estate', 'Miscellaneous', 'Telecommunications',
-                   'Consumer Staples', 'Utilities', 'Finance']
-        sectors.sort()
-        self.sectors = {}
-        for s in sectors:
-            self.sectors[s] = Stock.objects.filter(sector=s).count()
         self.backtest_years = [1.5, 1]
         self.pos_hold = [50, 40, 30, 20, 10]
         self.min_stock_price = [1, 2, 3, 4, 5, 10]
@@ -63,6 +64,7 @@ class BackTestView(View):
             'Feb, May, Aug, Nov',
             'Mar, Jun, Sep, Dec',
         ]
+        self.sectors = {k: 0 for k in sectors}
 
         # Setup html context
         self.html_context = {
@@ -72,11 +74,11 @@ class BackTestView(View):
             'market_cap': self.market_cap.keys(),
             'ipo_years': self.ipo_years,
             'sectors': self.sectors,
-            'all_stocks_num': Stock.objects.all().count(),
+            'all_stocks_num': 0,
             'backtest_years': self.backtest_years,
             'pos_hold': self.pos_hold,
             'min_stock_price': self.min_stock_price,
-            're_balancing_months': self.re_balancing_months
+            're_balancing_months': self.re_balancing_months,
         }
 
     def get(self, request):
@@ -94,7 +96,7 @@ class BackTestView(View):
 
     def post(self, request):
         # Get user's parameters
-        market_cap = request.POST.getlist('market_cap')
+        market_cap = request.POST.getlist('market-cap')
         method = request.POST.get('selected-method').rstrip("+-*/")
         ipo_years = int(request.POST.get('ipo_years'))
         sectors = [s for s in self.sectors if request.POST.get(s)]
@@ -105,15 +107,17 @@ class BackTestView(View):
         ranking_method = request.POST.get('ranking_method')
 
         # Add to context
-        self.html_context['selected_market_cap'] = market_cap
-        self.html_context['selected_method'] = method
-        self.html_context['selected_ipo_years'] = ipo_years
-        self.html_context['selected_sectors'] = sectors
-        self.html_context['selected_backtest_years'] = backtest_years
-        self.html_context['selected_pos_hold'] = pos_hold
-        self.html_context['selected_min_stock_price'] = min_stock_price
-        self.html_context['selected_re_balancing_months'] = re_balancing_months
-        self.html_context['selected_ranking_method'] = ranking_method
+        self.html_context.update({
+            'selected_market_cap': market_cap,
+            'selected_method': method,
+            'selected_ipo_years': ipo_years,
+            'selected_sectors': sectors,
+            'selected_backtest_years': backtest_years,
+            'selected_pos_hold': pos_hold,
+            'selected_min_stock_price': min_stock_price,
+            'selected_re_balancing_months': re_balancing_months,
+            'selected_ranking_method': ranking_method
+        })
 
         # Check input validity
         if not market_cap:
@@ -128,11 +132,21 @@ class BackTestView(View):
 
         # Start backtesting
         self.html_context['data'] = []
-        for sector in sectors:
-            self.start_backtest(request, market_cap, ipo_years, sector, method, backtest_years, pos_hold,
-                                min_stock_price, re_balancing_months, ranking_method)
 
+        with ThreadPoolExecutor(max_workers=min(len(sectors), 12)) as executor:
+            for sector in sectors:
+                executor.submit(self.start_backtest, request, market_cap, ipo_years, sector, method, backtest_years,
+                                pos_hold, min_stock_price, re_balancing_months, ranking_method)
+
+        # Sort result by sector
+        self.html_context['data'] = sorted(self.html_context['data'], key=lambda d: d['sector'])
+
+        # Update html context
         self.html_context['result'] = True
+        self.html_context['long_total'] = round(self.long_total, 2)
+        self.html_context['short_total'] = round(self.short_total, 2)
+        self.html_context['longshort_total'] = round(self.long_total - self.short_total, 2)
+        self.html_context['longshort_annualized'] = round(self.longshort_annualized / len(sectors), 2)
 
         return render(request, 'long_short/index.html', self.html_context)
 
@@ -140,7 +154,7 @@ class BackTestView(View):
                        re_balancing_months, ranking_method):
         # Get US stocks
         df_us_stocks = get_us_stocks(market_cap, ipo_years, sector)
-        if len(df_us_stocks) == 0:
+        if len(df_us_stocks) == 0 and not messages.get_messages(request):
             messages.warning(request, 'No stocks found, please adjust your filter.')
             return
 
@@ -150,22 +164,22 @@ class BackTestView(View):
         # Get result by method chose
         results = get_result_from_method(method, df_us_stocks, min_stock_price, l_re_balancing_dates,
                                          self.financials_data, self.balance_sheet_data, self.cash_flow_data)
-
         # Ranking and split results
         result_subset = ranking(results, ranking_method, min_stock_price)
 
         # Get performance for each re-balancing date
-        df_top, df_bottom = get_performance(result_subset, pos_hold, min_stock_price)
+        df_top, df_bottom = get_performance(result_subset, pos_hold)
         if df_top.empty or df_bottom.empty:
             messages.warning(request, "No financial data available, please adjust your filter.")
+            return
 
         # Add average performance to the top stocks, and bottom stocks
         get_average_performance(df_top)
         get_average_performance(df_bottom)
 
         # Calculate total performance for long and short stocks
-        total_performance_long = df_top.iloc[-1].sum(skipna=True)
-        total_performance_short = df_bottom.iloc[-1].sum(skipna=True)
+        long_total = df_top.iloc[-1].sum(skipna=True)
+        short_total = df_bottom.iloc[-1].sum(skipna=True)
 
         # Format dataframe
         for df in (df_top, df_bottom):
@@ -214,12 +228,20 @@ class BackTestView(View):
                     divide_columns(df, 1_000, '-')
 
         # Set html context
+        long_annualized = df_top.loc['Average'].apply(pd.to_numeric, errors='coerce').mean()
+        short_annualized = df_bottom.loc['Average'].apply(pd.to_numeric, errors='coerce').mean()
+        longshort_annualized = round((long_annualized - short_annualized) / 2 * 4, 2)
+        self.long_total += long_total
+        self.short_total += short_total
+        self.longshort_annualized += longshort_annualized
         d = {
             'sector': sector,
             'df_top': df_top,
             'df_bottom': df_bottom,
-            'long_total': round(total_performance_long, 2),
-            'short_total': round(total_performance_short, 2),
+            'long_total': round(long_total, 2),
+            'short_total': round(short_total, 2),
+            'longshort_total': round(long_total - short_total, 2),
+            'longshort_annualized': longshort_annualized,
         }
         self.html_context['data'].append(d)
 
@@ -231,7 +253,8 @@ def separate_words(string: str) -> str:
     return re.sub(r"(?<![A-Z])(?=[A-Z])", " ", string).strip()
 
 
-def get_us_stocks(selected_market_cap: list, min_ipo_years: int, sector: str) -> pd.DataFrame:
+def get_us_stocks(market_cap_filter: list=[], min_ipo_years: int = 0,
+                  sector_filter: str | list = None) -> pd.DataFrame:
     """
     Return us stocks based on selected market cap, min ipo years, and sectors.
     """
@@ -239,12 +262,12 @@ def get_us_stocks(selected_market_cap: list, min_ipo_years: int, sector: str) ->
     market_cap_value = list(market_cap.values())
 
     # Get selected market cap
-    mega = market_cap_str[0] in selected_market_cap
-    large = market_cap_str[1] in selected_market_cap
-    medium = market_cap_str[2] in selected_market_cap
-    small = market_cap_str[3] in selected_market_cap
-    micro = market_cap_str[4] in selected_market_cap
-    nano = market_cap_str[5] in selected_market_cap
+    mega = market_cap_str[0] in market_cap_filter
+    large = market_cap_str[1] in market_cap_filter
+    medium = market_cap_str[2] in market_cap_filter
+    small = market_cap_str[3] in market_cap_filter
+    micro = market_cap_str[4] in market_cap_filter
+    nano = market_cap_str[5] in market_cap_filter
 
     # Setup query
     mega_q = Q(market_cap__gte=market_cap_value[0]) if mega else Q()
@@ -253,13 +276,22 @@ def get_us_stocks(selected_market_cap: list, min_ipo_years: int, sector: str) ->
     small_q = Q(market_cap__range=[market_cap_value[3][0], market_cap_value[3][-1]]) if small else Q()
     micro_q = Q(market_cap__range=[market_cap_value[4][0], market_cap_value[4][-1]]) if micro else Q()
     nano_q = Q(market_cap__range=[market_cap_value[5][0], market_cap_value[5][-1]]) if nano else Q()
+    if sector_filter:
+        if isinstance(sector_filter, str):
+            sector_q = Q(sector=sector_filter)
+        elif isinstance(sector_filter, list):
+            sector_q = Q(sector__in=sector_filter)
+        else:
+            sector_q = Q()
+    else:
+        sector_q = Q()
 
     # Query database
     results = Stock.objects.filter(
         (mega_q | large_q | medium_q | small_q | micro_q | nano_q),
+        sector_q,
         ipo_year__lte=dt.datetime.today().year - min_ipo_years,
         ticker__regex=r'^[a-zA-Z]{1,4}$',
-        sector=sector
     )
 
     # Convert to dataframe
@@ -298,9 +330,11 @@ def get_re_balancing_dates(re_balancing_months: str, backtest_years: float = 1) 
 
     # Get a list of re-balancing date
     re_balancing_dates = []
-    while backtest_from.year <= dt.datetime.now().year:
+    finished = False
+    while backtest_from.year <= dt.datetime.now().year and not finished:
         for m in new_re_balancing_months:
             if backtest_from > dt.date.today():
+                finished = True
                 break
             re_balancing_dates.append(backtest_from.replace(month=m))
             if m == re_balancing_months[-1]:
@@ -332,12 +366,13 @@ def get_result_from_method(formula: str,
     # # Loop through re-balancing dates
     stock_list = result['Ticker'].tolist()
     for date in re_balancing_dates:
-        # Get valid stocks (above min_stock_price)
+        # Filter with the stock price lower than min_stock_price within 30 days
+        date_ = dt.datetime.combine(date, dt.datetime.min.time()).replace(tzinfo=dt.timezone.utc)
         df_candlesticks = pd.DataFrame(
             list(CandleStick.objects.filter(
                 stock__ticker__in=stock_list,
-                date__lt=dt.datetime.combine(date, dt.datetime.min.time()).replace(tzinfo=dt.timezone.utc),
-                date__gt=dt.datetime.combine(date - dt.timedelta(days=30), dt.datetime.min.time()).replace(tzinfo=dt.timezone.utc),
+                date__lt=date_,
+                date__gt=date_ - dt.timedelta(days=30),
                 adj_close__gte=min_stock_price,
             ).values())
         )
@@ -357,28 +392,37 @@ def get_result_from_method(formula: str,
                 report_date = date.replace(month=report_month, day=last_day)
             report_dates.append(report_date)
 
-        # Initialize data columns
-        for data in datas:
-            result[data] = np.nan
-
         # Loop through data points
         for data in datas:
-            # Get reports
-            if data in financials_data:
-                reports = FinancialReport.objects.filter(stock__id__in=valid_stocks_id, date__in=report_dates).order_by('date')
-            elif data in balance_sheet_data:
-                reports = BalanceSheet.objects.filter(stock__id__in=valid_stocks_id, date__in=report_dates).order_by('date')
-            elif data in cash_flow_data:
-                reports = CashFlow.objects.filter(stock__id__in=valid_stocks_id, date__in=report_dates).order_by('date')
+            # Create dataframe for financial reports
+            if data in [f.name for f in FinancialReport._meta.get_fields()]:
+                reports = pd.DataFrame(
+                    FinancialReport.objects.filter(
+                        stock__id__in=valid_stocks_id,
+                        date__in=report_dates
+                    ).order_by('date')
+                    .values('stock__ticker', data))
+            elif data in [f.name for f in BalanceSheet._meta.get_fields()]:
+                reports = pd.DataFrame(
+                    BalanceSheet.objects.filter(
+                        stock__id__in=valid_stocks_id,
+                        date__in=report_dates
+                    ).order_by('date')
+                    .values('stock__ticker', data))
+            elif data in [f.name for f in CashFlow._meta.get_fields()]:
+                reports = pd.DataFrame(
+                    CashFlow.objects.filter(
+                        stock__id__in=valid_stocks_id,
+                        date__in=report_dates
+                    ).order_by('date')
+                    .values('stock__ticker', data))
             else:
+                logging.warning(f"Unknown method: {data}")
                 continue
 
-            # Set data
-            for report in reports:
-                value = getattr(report, data)
-                value = float(value) if value else np.nan
-                result.loc[result['Ticker'] == report.stock.ticker, data] = value
-
+            # Update data
+            reports = reports.rename(columns={'stock__ticker': 'Ticker'})
+            result = result.merge(reports, how='left', on='Ticker')
 
         # Calculate result
         result_col_name = f'result-{dt.date.strftime(date, "%b %y")}'
@@ -425,6 +469,38 @@ def search_method(request):
     return JsonResponse({'result': results})
 
 
+@require_POST
+def update_stock_numbers(request):
+    # Get params from frontend
+    data = json.loads(request.body)
+    selected_market_cap = data.get('market_cap')
+    selected_sectors = data.get('sectors')
+    if 'All' in selected_sectors:
+        selected_sectors.remove('All')
+
+    # Get US stocks
+    stocks = get_us_stocks(market_cap_filter=selected_market_cap, sector_filter=selected_sectors)
+
+    result = {}
+
+    # Update stocks by sector
+    for sector in sectors:
+        result[sector] = len(stocks[stocks['sector'] == sector])
+    result['All'] = sum(result.values())
+
+    # Update stocks by market cap
+    for mc in market_cap:
+        if 'Mega' in mc:
+            result[mc] = len(stocks[stocks['market_cap'] >= market_cap[mc]])
+        else:
+            result[mc] = len(stocks[
+                                 (stocks['market_cap'] >= market_cap[mc][0]) &
+                                 (stocks['market_cap'] < market_cap[mc][-1])
+                                 ])
+
+    return JsonResponse({'result': result})
+
+
 def ranking(results: pd.DataFrame, ranking_method: str, min_stock_price: float) -> dict:
     result_subset = {}
     result_cols = [col for col in results.columns if col.startswith('result')]
@@ -436,16 +512,32 @@ def ranking(results: pd.DataFrame, ranking_method: str, min_stock_price: float) 
     return result_subset
 
 
-def get_performance(result_subset: dict, pos_hold: int, min_stock_price: float) -> Tuple[
+def get_performance(result_subset: dict, pos_hold: int) -> Tuple[
     pd.DataFrame, pd.DataFrame]:
     # Setup from_month
     next_month = f"result-{dt.date.strftime(dt.date.today() + dt.timedelta(days=30), '%b %y')}"
     l_from_months = list(result_subset.keys())
     l_to_months = l_from_months[1:] + [next_month]
 
-    # Loop through all periods
-    for from_month, to_month in tqdm(zip(l_from_months, l_to_months), desc="Getting performance..."):
-        # Initialize dataframe
+    # Get all tickers
+    tickers = [ticker['Ticker'].tolist() for ticker in result_subset.values()]
+    stock_list = []
+    for list_ in tickers:
+        stock_list += list_
+
+    # Create candlestick dataframe for the tickers
+    df_candlesticks = pd.DataFrame(
+        list(CandleStick.objects.filter(
+            stock__ticker__in=set(stock_list),
+            date__gte=extract_date_suffix(l_from_months[0]).replace(tzinfo=dt.timezone.utc),
+            date__lte=extract_date_suffix(l_to_months[-1]).replace(tzinfo=dt.timezone.utc),
+        ).values('stock__ticker', 'date', 'open', 'adj_close'))
+    )
+    df_candlesticks = df_candlesticks.rename(columns={'stock__ticker': 'ticker'})
+
+    # Loop through the re-balancing months
+    for from_month, to_month in tqdm(zip(l_from_months, l_to_months), desc="Updating quarterly performance..."):
+        # Initialize performance
         df = result_subset[from_month]
         df['Performance'] = np.nan
 
@@ -462,32 +554,34 @@ def get_performance(result_subset: dict, pos_hold: int, min_stock_price: float) 
 
         # Get performance change for each symbol
         for i, row in df.iterrows():
-            stock = Stock.objects.get(ticker=row['Ticker'])
-            candlesticks = CandleStick.objects.filter(stock=stock, date__gte=start_date, date__lte=end_date)
-            if not candlesticks:
+            # Check if candlesticks data exists
+            if not row['Ticker'] in set(df_candlesticks['ticker'].tolist()):
+                logging.warning(f"No candlesticks data for ticker {row['Ticker']}")
                 continue
 
-            # Candlestick data may too far away from re-balancing date
-            candlestick_start_date = candlesticks.first().date
-            candlestick_end_date = candlesticks.last().date
-            if candlestick_start_date > start_date + dt.timedelta(days=30) or \
-                    candlestick_end_date < end_date - dt.timedelta(days=30):
-                logging.warning(f"[ {row['Ticker']} ] Candlestick data is too far away.")
+            # Check if candlesticks data is too far away from re-balancing date
+            candles = df_candlesticks[
+                (df_candlesticks['ticker'] == row['Ticker']) &
+                (df_candlesticks['date'] >= start_date) &
+                (df_candlesticks['date'] <= end_date)
+                ]
+            if candles.head(1)['date'].tolist()[0] > start_date + dt.timedelta(days=10):
+                logging.warning(
+                    f"Start date of candlestick for ticker {row['Ticker']} > 10 days from re-balancing date, skip this ticker.")
+                continue
+            if candles.tail(1)['date'].tolist()[0] < end_date - dt.timedelta(days=10):
+                logging.warning(
+                    f"End date of candlestick for ticker {row['Ticker']} < 10 days from end of re-balancing date, skip this ticker.")
                 continue
 
             # Calculate performance
             try:
-                price_from = float(candlesticks.first().open)
-                price_to = float(candlesticks.last().adj_close)
-            except:
-                price_from = 0.0
-                price_to = 0.0
-
-            if price_from == 0:
-                logging.warning(f"Ticker: {row['Ticker']}: Invalid price.")
-                df.at[i, 'Performance'] = np.nan
-            else:
+                price_from = float(candles['open'].iloc[0])
+                price_to = float(candles['adj_close'].iloc[-1])
                 df.at[i, 'Performance'] = round((price_to / price_from - 1) * 100, 2)
+            except Exception as e:
+                logging.warning(f"Ticker: {row['Ticker']}: Error getting price: {str(e)}")
+                df.at[i, 'Performance'] = np.nan
 
         # Add result to subset
         result_subset[from_month] = df

@@ -1,4 +1,4 @@
-<div class="accordion accordion-flush" id="accordionFlush">
+<div class="accordion accordion-flush custom-shadow" id="accordionFlush">
     <!-- Collapsible area -->
     <div class="accordion-item">
 
@@ -26,11 +26,11 @@
                                 <div class="rounded-3 border p-3">
                                     {% for mc in market_cap %}
                                     <div class="col-md-12 my-1">
-                                        <input class="form-check-input" type="checkbox" id={{ mc }}
-                                               name="market_cap"
+                                        <input class="form-check-input market-cap-checkbox" type="checkbox" id={{ mc }}
+                                               name="market-cap"
                                                {% if mc in selected_market_cap %}checked{% endif %}
                                                value="{{ mc }}">
-                                        <label class="form-check-label" for={{ mc }}>{{ mc }}</label>
+                                        <label class="form-check-label market-cap-checklabel" for={{ mc }}>{{ mc }}</label>
                                     </div>
                                     {% endfor %}
                                 </div>
@@ -42,9 +42,9 @@
                                 <div class="rounded-3 border p-3">
                                     <!-- 'All' checkbox -->
                                     <div class="d-md-inline-flex m-2">
-                                        <input type="checkbox" class="form-check-input me-1" id="all-sectors-checkbox"
-                                               name="all-sectors-checkbox">
-                                        <label class="form-check-label" for="all-sectors-checkbox">All ({{ all_stocks_num }})</label>
+                                        <input type="checkbox" class="form-check-input me-1 sector-checkbox" id="all-sectors-checkbox"
+                                               name="all-sectors-checkbox" value="All">
+                                        <label class="form-check-label sector-checklabel" for="all-sectors-checkbox">All ({{ all_stocks_num }})</label>
                                     </div>
 
                                     <!-- Other checkboxes -->
@@ -52,8 +52,11 @@
                                     <div class="d-md-inline-flex m-2">
                                         <input type="checkbox" class="form-check-input me-1 sector-checkbox"
                                                id="{{ s }}" name="{{ s }}"
+                                               value="{{ s }}"
                                                {% if s in selected_sectors %} checked {% endif %}>
-                                        <label class="form-check-label" for="{{ s }}">{{ s }} ({{ count }})</label>
+                                        <label class="form-check-label sector-checklabel" for="{{ s }}">
+                                            {{ s }} ({{ count }})
+                                        </label>
                                     </div>
                                     {% endfor %}
                                 </div>

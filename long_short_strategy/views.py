@@ -171,7 +171,7 @@ class BackTestView(View):
         # Get performance for each re-balancing date
         df_top, df_bottom = get_performance(result_subset, pos_hold)
         if df_top.empty or df_bottom.empty:
-            messages.warning(request, "No financial data available, please adjust your filter.")
+            messages.warning(request, f"No financial data available for {sector}, please adjust your filter.")
             return
 
         # Add average performance to the top stocks, and bottom stocks
@@ -421,7 +421,7 @@ def get_result_from_method(formula: str,
         # Calculate result
         result_col_name = f'result-{dt.date.strftime(date, "%b %y")}'
         result = apply_formula(result, formula, result_col_name)
-        result = result.replace([np.inf, -np.inf], np.nan)
+        result = result.infer_objects(copy=False).replace([np.inf, -np.inf], np.nan)
 
         # Delete data columns
         result.drop(columns=datas, inplace=True)
@@ -558,7 +558,7 @@ def get_performance(result_subset: dict, pos_hold: int) -> Tuple[pd.DataFrame, p
             candles = df_candlesticks[
                 (df_candlesticks['ticker'] == row['Ticker']) &
                 (df_candlesticks['date'] >= start_date) &
-                (df_candlesticks['date'] <= end_date)
+                (df_candlesticks['date'] < end_date)
                 ]
             if candles.head(1)['date'].tolist()[0] > start_date + dt.timedelta(days=10):
                 logging.warning(

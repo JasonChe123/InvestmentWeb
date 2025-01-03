@@ -22,21 +22,23 @@
     <!-- Summary -->
     <div class="mb-5">
         <!-- Title -->
-        <h4 class="my-3">
-            Backtest Result for Top {{ selected_pos_hold }} and Bottom {{ selected_pos_hold }} Stocks<br>
-        </h4>
-        <h5>
-            Ranked by - {{ selected_method }}
-        </h5>
-        <ul>
-            <li>(Stocks are omitted if the stock price is under ${{ selected_min_stock_price|floatformat:"0" }} from
-                the 30 days prior to re-balancing date)
-            </li>
-        </ul>
+        <div class="my-5">
+            <h4 class="my-3">
+                Backtest Result for Top {{ selected_pos_hold }} and Bottom {{ selected_pos_hold }} Stocks<br>
+            </h4>
+            <h5>
+                Ranked by - {{ selected_method }}
+            </h5>
+            <ul>
+                <li>(Stocks are omitted if the stock price is under ${{ selected_min_stock_price|floatformat:"0" }} from
+                    the 30 days prior to re-balancing date)
+                </li>
+            </ul>
+        </div>
 
         <div class="w-100 d-inline-flex gap-3">
             <!-- Summary table -->
-            <table class="table table-sm table-bordered w-75 custom-shadow">
+            <table class="table table-sm table-bordered table-hover w-75 custom-shadow">
                 <!-- Header -->
                 <tr>
                     <th></th>

@@ -29,6 +29,7 @@ $(document).ready(function () {
     const result = scriptTag.attr("result");
 
     function extractTableData(table) {
+        /* Return data from table. */
         const rows = table.rows;
         const data = [];
 
@@ -45,6 +46,7 @@ $(document).ready(function () {
     }
 
     function modifySelectedMethod(method) {
+        /* Modify the 'Selected Method' from input-params. */
         // If the last string is +, -, *, /, (
         if (/[+\-*\/(]$/.test(selectedMethod.text())) {
             // Add the selected method
@@ -70,12 +72,14 @@ $(document).ready(function () {
     }
 
     function validateExportButton() {
+        /* Validate the export button with amount input and file type checking. */
         let amountInvalid = amountInput.hasClass("is-invalid") || !amountInput.val();
         let fileTypeInvalid = fileInput.hasClass("is-invalid");
         exportButton.prop('disabled', amountInvalid || fileTypeInvalid);
     }
 
     function updateStockNum() {
+        /* Update the stock number for each sector and market-cap. */
         // Get selected market cap and sectors
         let marketCap = [];
         let sectors = [];
@@ -129,6 +133,8 @@ $(document).ready(function () {
     // Hide result first
     searchResult.hide();
 
+    updateStockNum();
+
     // 'All' checkbox event
     allCheckbox.change(function () {
         sectorCheckbox.prop('checked', this.checked);
@@ -153,11 +159,13 @@ $(document).ready(function () {
         // Server will render the page with the calculated result
     });
 
-    // Format table: 'red' color for negative values, align all numbers to the right
+    // Format table: 'red' color for negative values, align all numbers to the right, turn numbers to scientific notation
     for (let i = 0; i < cells.length; i++) {
         const value = parseFloat(cells[i].textContent);
+
         if (typeof (value) === 'number' && !isNaN(value)) cells[i].style.textAlign = 'right';
         if (!isNaN(value) && value < 0) cells[i].classList.add("text-danger");
+        if (value > 1000 || value < -1000) cells[i].textContent = value.toExponential(2);
     }
 
     // Format table: add left border to ticker columns
@@ -296,8 +304,8 @@ $(document).ready(function () {
     // Auto expand 'Backtest Parameters'
     if (!result) {
         $('#collapse-params-button').click();
-        updateStockNum();
     }
+
     // Validate amount from basket trader
     amountInput.on("input change blur", function (event) {
         const value = event.target.value.trim();

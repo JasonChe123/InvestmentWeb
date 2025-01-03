@@ -164,6 +164,7 @@ class BackTestView(View):
         # Get result by method chose
         results = get_result_from_method(method, df_us_stocks, min_stock_price, l_re_balancing_dates,
                                          self.financials_data, self.balance_sheet_data, self.cash_flow_data)
+
         # Ranking and split results
         result_subset = ranking(results, ranking_method, min_stock_price)
 
@@ -211,7 +212,7 @@ class BackTestView(View):
 
             # Divide the selected columns by the divisor
             df[cols] = df[cols].map(
-                lambda x: round(x / divisor, 2) if isinstance(x, (int, float)) and not np.isnan(x) else x
+                lambda x: round(x / divisor, 3) if isinstance(x, (int, float)) and not np.isnan(x) else x
             )
 
             return df
@@ -219,13 +220,6 @@ class BackTestView(View):
         if len(df_top) > 1:
             max_value = max(pd.to_numeric(df_top.loc[0], errors='coerce').dropna())
             min_value = min(pd.to_numeric(df_bottom.loc[0], errors='coerce').dropna())
-            for df in (df_top, df_bottom):
-                if min_value < -1_000_000_000 or max_value > 1_000_000_000:
-                    divide_columns(df, 1_000_000_000, '-')
-                elif min_value < -1_000_000 or max_value > 1_000_000:
-                    divide_columns(df, 1_000_000, '-')
-                elif min_value < -1_000 or max_value > 1_000:
-                    divide_columns(df, 1_000, '-')
 
         # Set html context
         long_annualized = df_top.loc['Average'].apply(pd.to_numeric, errors='coerce').mean()
@@ -253,7 +247,7 @@ def separate_words(string: str) -> str:
     return re.sub(r"(?<![A-Z])(?=[A-Z])", " ", string).strip()
 
 
-def get_us_stocks(market_cap_filter: list=[], min_ipo_years: int = 0,
+def get_us_stocks(market_cap_filter: list = [], min_ipo_years: int = 0,
                   sector_filter: str | list = None) -> pd.DataFrame:
     """
     Return us stocks based on selected market cap, min ipo years, and sectors.
@@ -507,13 +501,13 @@ def ranking(results: pd.DataFrame, ranking_method: str, min_stock_price: float) 
     ascending = True if ranking_method == 'Ascending' else False
     for col in result_cols:
         result = results[['Ticker', col]].dropna()
+        result = result[result[col] != 0]
         result_subset[col] = result[['Ticker', col]].sort_values(by=col, ascending=ascending)
 
     return result_subset
 
 
-def get_performance(result_subset: dict, pos_hold: int) -> Tuple[
-    pd.DataFrame, pd.DataFrame]:
+def get_performance(result_subset: dict, pos_hold: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Setup from_month
     next_month = f"result-{dt.date.strftime(dt.date.today() + dt.timedelta(days=30), '%b %y')}"
     l_from_months = list(result_subset.keys())
@@ -544,6 +538,7 @@ def get_performance(result_subset: dict, pos_hold: int) -> Tuple[
         # Format start_date and end_date: result-May 23 -> 2023-05-01
         start_date = extract_date_suffix(from_month).replace(tzinfo=dt.timezone.utc)
         end_date = extract_date_suffix(to_month).replace(tzinfo=dt.timezone.utc)
+
         # In case of today == from_month
         if start_date == end_date:
             end_date = dt.datetime.today().replace(tzinfo=dt.timezone.utc)
@@ -569,7 +564,7 @@ def get_performance(result_subset: dict, pos_hold: int) -> Tuple[
                 logging.warning(
                     f"Start date of candlestick for ticker {row['Ticker']} > 10 days from re-balancing date, skip this ticker.")
                 continue
-            if candles.tail(1)['date'].tolist()[0] < end_date - dt.timedelta(days=10):
+            if candles.tail(1)['date'].tolist()[0] < end_date - dt.timedelta(days=10) and to_month != l_to_months[-1]:
                 logging.warning(
                     f"End date of candlestick for ticker {row['Ticker']} < 10 days from end of re-balancing date, skip this ticker.")
                 continue

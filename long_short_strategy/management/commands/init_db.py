@@ -150,7 +150,7 @@ def update_candlestick_db(df_stock_list: pd.DataFrame):
     df_stock_list = df_stock_list[df_stock_list['Symbol'].str.len() < 5]
     df_stock_list = df_stock_list[~df_stock_list['Symbol'].str.contains('/')]
     stock_list = df_stock_list['Symbol'].unique().tolist()
-    batch_size = 200
+    batch_size = 150
     for i in range(0, len(stock_list), batch_size):
         start_time = time.time()
         print(f"\nDownloading data {i}-{i + batch_size} from yfinance...")

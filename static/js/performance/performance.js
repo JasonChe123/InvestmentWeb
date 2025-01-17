@@ -1,6 +1,5 @@
 $(document).ready(function () {
     // Get Elements
-    const scriptTag = $('#performance-js');
     const loadingModal = new bootstrap.Modal($('#loading-modal'));
     const backButton = $('#back-btn');
     const portfolioNameInput = $('#input-portfolio-name');
@@ -9,8 +8,16 @@ $(document).ready(function () {
     const portfolioNameError = $('#portfolio-name-error');
     const fileTypeError = $('#file-type-error');
     const uploadButton = $('#button-upload');
+    const tables = $('table');
+    const heads = tables.find('th');
+    const cells = tables.find('td');
 
+    // Variables from script-tag
+    const scriptTag = $('#performance-js');
     const csrfToken = scriptTag.attr('csrf_token');
+
+
+    // Other variables
     let portfolioToDelete = null;
     let portfolioToEdit = null;
     let portfolioNameValid = true;
@@ -75,6 +82,15 @@ $(document).ready(function () {
             uploadButton.prop('disabled', true);
         } else {
             uploadButton.prop('disabled', false);
+        }
+    }
+
+    // Format table, red color for negative
+    for (let i = 0; i < cells.length; i++) {
+        const value = parseFloat(cells[i].textContent);
+        if (!isNaN(value) && value < 0) {
+            cells[i].classList.add("text-danger");
+            cells[i].textContent = `( ${cells[i].textContent.replace("-", "")} )`;
         }
     }
 

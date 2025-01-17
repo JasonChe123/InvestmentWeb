@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'frontpage.apps.FrontpageConfig',
     'long_short_strategy.apps.LongShortStrategyConfig',
     'performance.apps.PerformanceConfig',
+    'manage_database.apps.ManageDatabaseConfig',
     # authentication packages
     'django.contrib.sites',
     'allauth',

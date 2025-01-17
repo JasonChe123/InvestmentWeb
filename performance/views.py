@@ -58,6 +58,8 @@ def home(request):
         init_cost_negative = int(df_negative['Cost'].sum())
         df_positive = df_positive.replace(np.nan, "")
         df_negative = df_negative.replace(np.nan, "")
+        total_performance = round((df_positive['Profit'].sum() + df_negative['Profit'].sum()) /
+                                  (init_cost_positive + init_cost_negative) * 100, 2)
 
         # Append to processed portfolio
         processed_portfolio.append({
@@ -77,7 +79,8 @@ def home(request):
                 'initial_cost': init_cost_negative,
                 'mean_performance': mean_negative,
                 'profit': round(df_negative['Profit'].sum(), 2),
-            }
+            },
+            'total_performance': total_performance,
         })
 
     context = {'portfolio': processed_portfolio}
@@ -168,14 +171,16 @@ def edit_portfolio(request):
         with transaction.atomic():
             if new_portfolio_name and new_portfolio_name.strip():
                 if new_portfolio_name.strip() == portfolio_name:
-                    messages.info(request, f"The new portfolio name '{new_portfolio_name}' is the same as the current one.")
+                    messages.info(request,
+                                  f"The new portfolio name '{new_portfolio_name}' is the same as the current one.")
                 else:
                     # Update portfolio name
                     Portfolio.objects.filter(
                         user=request.user,
                         group_name=portfolio_name
                     ).update(group_name=new_portfolio_name)
-                    messages.success(request, f"The portfolio '{portfolio_name}' was renamed to '{new_portfolio_name}'.")
+                    messages.success(request,
+                                     f"The portfolio '{portfolio_name}' was renamed to '{new_portfolio_name}'.")
                     portfolio_name = new_portfolio_name
 
             if file:

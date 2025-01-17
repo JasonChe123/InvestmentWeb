@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block title %}US Economy{% endblock title %}
+
+{% block content %}
+
+<!-- Modal (loading) -->
+{% include 'partials/_loading_modal.html' %}
+
+<!-- T10Y2Y chart -->
+<div class="card m-3">
+    <div class="card-header">
+        <h5>10-Year Treasury Constant Minus 2-Year Treasury Constant Maturity (T10Y2Y)</h5>
+    </div>
+    <div class="card-body">
+        <div id="chart-t10y2y" class='apex-charts'></div>
+    </div>
+    <div class="card-footer">
+        Negative values are considered as a prediction of recession.
+    </div>
+</div>
+
+<!-- T10Y2Y study -->
+<div class="card m-3">
+    <div class="card-header">
+        <h5>Study of Inverted Yield Curve (T10Y2Y) vs S&P500 From 1988 to 2010 (Log Scale)</h5>
+    </div>
+    <div class="card-body text-center">
+        <img src="{% static 'images/T10Y2Ystudy.png' %}" class="img-fluid rounded-3" alt="">
+    </div>
+    <div class="card-footer">
+        <h6>Theory</h6>
+        <p>
+            The long-term yield is generally higher than the short-term yield. While long-term yield
+            drops below short-term yield, the demand of long-term bonds is increasing and the demand
+            of short-term bonds is decreasing. Investors must have a strong belief in an impending
+            economic downturn, where long-term safety becomes more appealing.
+        </p>
+        <h6>Criticism</h6>
+        <p>
+            The time lag between an inversion and a recession is variable, ranging from a few months
+            to over a year, making it challenging to act on the signal.
+        </p>
+        <h6>Conclusion</h6>
+        <p>
+            The inverted yield curve is a powerful but imperfect tool for forecasting economic trends.
+            While it has historically been a reliable recession predictor, investors should use it
+            alongside other economic indicators, such as unemployment rates, consumer confidence, and
+            corporate earnings, to form a comprehensive market outlook.
+        </p>
+    </div>
+</div>
+
+<script src="{% static 'js/us_economy/us_economy.js' %}" id="index-js" chart-t10y2y-data="{{ chart_t10y2y.data }}"
+    chart-t10y2y-x-axis-label="{{ chart_t10y2y.x_axis_label }}"></script>
+
+{% endblock content %}

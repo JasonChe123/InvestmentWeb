@@ -6,14 +6,30 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Investment Web{% endblock title %}</title>
+
+    <!-- Favicon -->
     <link href="{% static 'images/favicons/favicon.png' %}" rel="icon" sizes="32x32" type="image/png">
-    <link href="{% static 'css/bootstrap.min.css' %}" rel="stylesheet">
-    <link href="{% static 'css/sidebars.css' %}" rel="stylesheet">
-    <link href="{% static 'css/social_account.css' %}" rel="stylesheet">
-    <link href="{% static 'css/custom_dark_mode.css' %}" rel="stylesheet">
-    <link href="{% static 'css/all.min.css' %}" rel="stylesheet">
-    <script src="{% static 'js/jquery-3.6.0.min.js' %}"></script>
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/responsive.bootstrap5.min.css' %}">
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+
+    <!-- ApexCharts -->
+    <link rel="stylesheet" href="{% static 'css/apexcharts.css' %}">
+    <script src="{% static 'js/apexcharts.js' %}" type="module"></script>
+    <!--    <script src="{% static 'js/apexcharts.common.js' %}" type="module"></script>-->
+    <script src="{% static 'js/apexcharts.esm.js' %}" type="module"></script>
+    <script src="{% static 'js/apexcharts.min.js' %}" type="module"></script>
+    <!--    <script src="{% static 'js/apexcharts2.js' %}" type="module"></script>-->
+
+
+    <!-- Others -->
+    <link rel="stylesheet" href="{% static 'css/sidebars.css' %}">
+    <link rel="stylesheet" href="{% static 'css/social_account.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom_dark_mode.css' %}">
+    <link rel="stylesheet" href="{% static 'css/all.min.css' %}">
+    <script src="{% static 'js/jquery-3.6.0.min.js' %}"></script>
 </head>
 
 <!-- Body -->
@@ -30,9 +46,7 @@
                 </button>
                 <div class="collapse" id="home-collapse">
                     <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                        <li><a href="#" class="rounded">Overview</a></li>
-                        <li><a href="#" class="rounded">Financial Weather</a></li>
-                        <li><a href="#" class="rounded">Virtual Portfolio</a></li>
+                        <li><a href="{% url 'us-economy' %}" class="rounded">Financial Weather</a></li>
                     </ul>
                 </div>
             </li>
@@ -46,8 +60,6 @@
                 <div class="collapse" id="dashboard-collapse">
                     <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                         <li><a href="{% url 'performance' %}" class="rounded">Performance</a></li>
-                        <li><a href="#" class="rounded">Risk Report</a></li>
-                        <li><a href="#" class="rounded">Activity</a></li>
                     </ul>
                 </div>
             </li>
@@ -60,10 +72,7 @@
                 </button>
                 <div class="collapse" id="orders-collapse">
                     <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                        <li><a href="#" class="rounded">Marco</a></li>
                         <li><a href="{% url 'longshort-backtest' %}" class="rounded">LongShort</a></li>
-                        <li><a href="#" class="rounded">DayTrade</a></li>
-                        <li><a href="#" class="rounded">Equity Curve Trading</a></li>
                     </ul>
                 </div>
             </li>
@@ -81,8 +90,6 @@
                 </button>
                 <div class="collapse" id="account-collapse">
                     <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                        <li><a href="#" class="rounded">Notification</a></li>
-                        <li><a href="#" class="rounded">Manage Account</a></li>
                         {% if user.is_authenticated %}
                         <li><a href="{% url 'account_logout' %}" class="rounded">Sign Out</a></li>
                         {% else %}
@@ -110,6 +117,6 @@
     </div>
 </main>
 
-<script src="{% static 'js/base.js' %}"></script>
+<script src="{% static 'js/base.js' %}" type="module"></script>
 </body>
 </html>

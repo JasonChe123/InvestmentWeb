@@ -35,6 +35,10 @@
                         <th class="w-25">Created on</th>
                         <td class="w-75">{{ data.created }}</td>
                     </tr>
+                    <tr>
+                        <th class="w-25">Performance</th>
+                        <td class="w-75">{{ data.total_performance }}%</td>
+                    </tr>
                 </table>
             </div>
 
@@ -65,18 +69,8 @@
                     </tr>
                     <tr>
                         <td class="text-end">{{ data.positive.initial_cost|intcomma }}</td>
-
-                        {% if data.positive.mean_performance < 0 %}
-                        <td class="text-end text-danger">{{ data.positive.mean_performance|intcomma }}</td>
-                        {% else %}
                         <td class="text-end">{{ data.positive.mean_performance|intcomma }}</td>
-                        {% endif %}
-
-                        {% if data.positive.profit < 0 %}
-                        <td class="text-end text-danger">{{ data.positive.profit|intcomma }}</td>
-                        {% else %}
                         <td class="text-end">{{ data.positive.profit|intcomma }}</td>
-                        {% endif %}
                     </tr>
                 </table>
             </div>
@@ -96,17 +90,11 @@
                         {% for cell in row %}
                         <!-- Is a number -->
                         {% if cell|floatformat:"2" %}
-                        {% if cell < 0 %}
-                        <td class="text-end text-danger">
-                            ( {{ cell|floatformat:"2"|slice:"1:"|intcomma }} )
-                        </td>
-                        {% else %}
                         <td class="text-end">{{ cell|floatformat:"2"|intcomma }}</td>
-                        {% endif %}
 
                         <!-- Is not a number -->
                         {% else %}
-                        <td class="text-center">{{ cell }}</td>
+                        <td>{{ cell }}</td>
                         {% endif %}
                         {% endfor %}
                     </tr>
@@ -128,18 +116,8 @@
                     </tr>
                     <tr>
                         <td class="text-end">{{ data.negative.initial_cost|intcomma }}</td>
-
-                        {% if data.negative.mean_performance < 0 %}
-                        <td class="text-end text-danger">{{ data.negative.mean_performance|intcomma }}</td>
-                        {% else %}
                         <td class="text-end">{{ data.negative.mean_performance|intcomma }}</td>
-                        {% endif %}
-
-                        {% if data.negative.profit < 0 %}
-                        <td class="text-end text-danger">{{ data.negative.profit|intcomma }}</td>
-                        {% else %}
                         <td class="text-end">{{ data.negative.profit|intcomma }}</td>
-                        {% endif %}
                     </tr>
                 </table>
             </div>
@@ -160,17 +138,11 @@
 
                         <!-- Is a number -->
                         {% if cell|floatformat:"2" %}
-                        {% if cell < 0 %}
-                        <td class="text-end text-danger">
-                            ( {{ cell|floatformat:"2"|slice:"1:"|intcomma }} )
-                        </td>
-                        {% else %}
                         <td class="text-end">{{ cell|floatformat:"2"|intcomma }}</td>
-                        {% endif %}
 
                         <!-- Is not a number -->
                         {% else %}
-                        <td class="text-center">{{ cell }}</td>
+                        <td>{{ cell }}</td>
                         {% endif %}
                         {% endfor %}
                     </tr>
@@ -223,6 +195,9 @@
 </div>
 
 <!-- Script -->
-<script src="{% static 'js/performance/performance.js' %}" id="performance-js" csrf_token="{{ csrf_token }}"></script>
+<script src="{% static 'js/performance/performance.js' %}"
+        id="performance-js"
+        csrf_token="{{ csrf_token }}"
+></script>
 
 {% endblock content %}

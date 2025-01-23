@@ -4,3 +4,7 @@
 db.sqlite3
 django.log
 __pycache__
+companyfacts/
+company_tickers.json
+stock_list.csv
+tester.ipynb

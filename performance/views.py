@@ -11,7 +11,7 @@ import json
 import logging
 import numpy as np
 import pandas as pd
-from long_short_strategy.models import Stock, CandleStick
+from manage_database.models import Stock, CandleStick
 from .models import Portfolio
 
 

@@ -18,7 +18,9 @@ import re
 import time
 from tqdm import tqdm
 from typing import Tuple
-from .models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
+# from .models import Stock, FinancialReport, BalanceSheet, CashFlow, CandleStick
+from manage_database.models import Stock, IncomeStatement, BalanceSheet, CashFlow, CandleStick
+
 
 import pdb
 
@@ -47,7 +49,7 @@ class BackTestView(View):
         self.market_cap = market_cap
 
         # # Initialize parameter: fundamental data
-        self.financials_data = [separate_words(field.name) for field in FinancialReport._meta.get_fields() if
+        self.financials_data = [separate_words(field.name) for field in IncomeStatement._meta.get_fields() if
                                 field.concrete and field.name not in ('id', 'stock', 'date')]
         self.balance_sheet_data = [separate_words(field.name) for field in BalanceSheet._meta.get_fields() if
                                    field.concrete and field.name not in ('id', 'stock', 'date')]
@@ -282,7 +284,8 @@ def get_us_stocks(market_cap_filter: list = [], min_ipo_years: int = 0,
 
     # Query database
     results = Stock.objects.filter(
-        (mega_q | large_q | medium_q | small_q | micro_q | nano_q),
+        # todo: to be reviewed
+        # (mega_q | large_q | medium_q | small_q | micro_q | nano_q),
         sector_q,
         ipo_year__lte=dt.datetime.today().year - min_ipo_years,
         ticker__regex=r'^[a-zA-Z]{1,4}$',
@@ -389,9 +392,9 @@ def get_result_from_method(formula: str,
         # Loop through data points
         for data in datas:
             # Create dataframe for financial reports
-            if data in [f.name for f in FinancialReport._meta.get_fields()]:
+            if data in [f.name for f in IncomeStatement._meta.get_fields()]:
                 reports = pd.DataFrame(
-                    FinancialReport.objects.filter(
+                    IncomeStatement.objects.filter(
                         stock__id__in=valid_stocks_id,
                         date__in=report_dates
                     ).order_by('date')
@@ -451,7 +454,7 @@ def search_method(request):
     if search_str.strip() == '':
         return JsonResponse({'result': []})
 
-    fields_financials = [separate_words(field.name) for field in FinancialReport._meta.get_fields() if
+    fields_financials = [separate_words(field.name) for field in IncomeStatement._meta.get_fields() if
                          field.concrete and field.name not in ('id', 'stock', 'date')]
     fields_balancesheet = [separate_words(field.name) for field in BalanceSheet._meta.get_fields() if
                            field.concrete and field.name not in ('id', 'stock', 'date')]
@@ -482,15 +485,16 @@ def update_stock_numbers(request):
         result[sector] = len(stocks[stocks['sector'] == sector])
     result['All'] = sum(result.values())
 
-    # Update stocks by market cap
-    for mc in market_cap:
-        if 'Mega' in mc:
-            result[mc] = len(stocks[stocks['market_cap'] >= market_cap[mc]])
-        else:
-            result[mc] = len(stocks[
-                                 (stocks['market_cap'] >= market_cap[mc][0]) &
-                                 (stocks['market_cap'] < market_cap[mc][-1])
-                                 ])
+    # todo: to be reviewed
+    # # Update stocks by market cap
+    # for mc in market_cap:
+    #     if 'Mega' in mc:
+    #         result[mc] = len(stocks[stocks['market_cap'] >= market_cap[mc]])
+    #     else:
+    #         result[mc] = len(stocks[
+    #                              (stocks['market_cap'] >= market_cap[mc][0]) &
+    #                              (stocks['market_cap'] < market_cap[mc][-1])
+    #                              ])
 
     return JsonResponse({'result': result})
 

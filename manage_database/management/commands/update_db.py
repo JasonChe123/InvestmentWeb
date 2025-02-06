@@ -114,6 +114,7 @@ class Command(BaseCommand):
             country = row["Country"]
             sector = row["Sector"]
             industry = row["Industry"]
+            market_cap = row['Market Cap']
 
             # Deal with missing data
             ipo_year = 0 if np.isnan(ipo_year) else ipo_year
@@ -122,6 +123,7 @@ class Command(BaseCommand):
             industry = (
                 "Miscellaneous" if not isinstance(industry, str) else industry.strip()
             )
+            market_cap = 0 if not market_cap else market_cap
 
             # Create or update
             stock, created = Stock.objects.get_or_create(ticker=ticker)
@@ -130,20 +132,22 @@ class Command(BaseCommand):
             if all(
                 [
                     stock.name == name,
-                    stock.country == country,
                     stock.ipo_year == ipo_year,
+                    stock.country == country,
                     stock.sector == sector,
                     stock.industry == industry,
+                    stock.market_cap == market_cap,
                 ]
             ):
                 continue
 
             # If new or changes, then update it
             stock.name = name
-            stock.country = country
             stock.ipo_year = ipo_year
+            stock.country = country
             stock.sector = sector
             stock.industry = industry
+            stock.market_cap = market_cap
 
             # Add stock instance to a list, pending to be bulk updated
             l_stocks.append(stock)
@@ -444,7 +448,7 @@ class Command(BaseCommand):
         zip_file_path = os.path.join(dir_companyfacts, "companyfacts.zip")
 
         # # Delete all files in dir_companyfacts
-        # delete_downloaded_data()
+        delete_downloaded_data()
 
         # Prepare header for requests module
         header = {
@@ -455,44 +459,43 @@ class Command(BaseCommand):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36",
         }
 
-        # # Downlaod zip-file for companyfacts
-        # try:
-        #     url = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
-        #     res = requests.get(url, stream=True, headers=header)
-        #     if not res.ok:
-        #         self.stdout.write(
-        #             self.style.ERROR(
-        #                 f"Error downloading from www.sec.gov\n{res.content}"
-        #             )
-        #         )
-        #         self.stdout.write(self.style.NOTICE("Exit updating financial reports"))
-        #         return
-        # except Exception as e:
-        #     self.stdout.write(
-        #         self.style.ERROR(f"Error downloading reports from SEC website: {e}")
-        #     )
-        #     self.stdout.write(self.style.NOTICE("Exit updating financial reports"))
-        #     return
+        # Downlaod zip-file for companyfacts
+        try:
+            url = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
+            res = requests.get(url, stream=True, headers=header)
+            if not res.ok:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"Error downloading from www.sec.gov\n{res.content}"
+                    )
+                )
+                self.stdout.write(self.style.NOTICE("Exit updating financial reports"))
+                return
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f"Error downloading reports from SEC website: {e}")
+            )
+            self.stdout.write(self.style.NOTICE("Exit updating financial reports"))
+            return
 
-        # # Save zip-file
-        # with open(zip_file_path, mode="wb") as file:
-        #     for chunk in res.iter_content(chunk_size=10 * 1024):
-        #         file.write(chunk)
+        # Save zip-file
+        with open(zip_file_path, mode="wb") as file:
+            for chunk in res.iter_content(chunk_size=10 * 1024):
+                file.write(chunk)
 
-        # # Extract companyfacts from zip-file
-        # if zipfile.is_zipfile(zip_file_path):
-        #     with zipfile.ZipFile(zip_file_path, mode="r") as archive:
-        #         archive.extractall(dir_companyfacts)
-        # else:
-        #     self.stdout.write(
-        #         self.style.ERROR("File 'companyfacts.zip' is not a zip file")
-        #     )
-        #     self.stdout.write(self.style.NOTICE("Exit updating financial reports"))
-        #     return
+        # Extract companyfacts from zip-file
+        if zipfile.is_zipfile(zip_file_path):
+            with zipfile.ZipFile(zip_file_path, mode="r") as archive:
+                archive.extractall(dir_companyfacts)
+        else:
+            self.stdout.write(
+                self.style.ERROR("File 'companyfacts.zip' is not a zip file")
+            )
+            self.stdout.write(self.style.NOTICE("Exit updating financial reports"))
+            return
 
         # Download cik/ticker mapper
         try:
-            raise Exception  # todo: use existing file for testing
             res = requests.get(
                 "https://www.sec.gov/files/company_tickers.json", headers=header
             )
@@ -587,7 +590,7 @@ class Command(BaseCommand):
                 )
 
         # # Delete downloaded files
-        # delete_downloaded_data()
+        delete_downloaded_data()
 
         # Finish message
         self.stdout.write(self.style.NOTICE("Finish updating financial reports"))

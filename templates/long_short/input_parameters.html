@@ -66,7 +66,7 @@
                         <div class="row my-3">
                             <!-- Other params -->
                             <div class="col-md-4">
-                                <!-- Ipo years -->
+                                <!-- Ipo years (Hidden)-->
                                 <div class="form-group my-3 align-self-end" hidden>
                                     <label for="ipo_years">Min IPO Years</label>
                                     <select id="ipo_years" name='ipo_years' class="form-control">
@@ -169,46 +169,34 @@
 
                                         <!-- Income statement -->
                                         <div class="form-group my-2 align-self-end">
-                                            <label for="methods_financial">Income Statement</label>
-                                            <select id="methods_financial" name='methods_financial'
+                                            <label for="methods_income_statement"><i>Income Statement</i></label>
+                                            <select id="methods_income_statement" name='methods_income_statement'
                                                     class="form-control method-selector">
-                                                {% for m in methods_financial %}
-                                                {% if m == selected_financial_method %}
-                                                <option selected>{{ m }}</option>
-                                                {% else %}
+                                                {% for m in methods_income_statement %}
                                                 <option>{{ m }}</option>
-                                                {% endif %}
                                                 {% endfor %}
                                             </select>
                                         </div>
 
                                         <!-- Balance sheet -->
                                         <div class="form-group my-2 align-self-end">
-                                            <label for="methods_balance_sheet">Balance Sheet</label>
+                                            <label for="methods_balance_sheet"><i>Balance Sheet</i></label>
                                             <select id="methods_balance_sheet"
                                                     name='methods_balance_sheet'
                                                     class="form-control method-selector">
                                                 {% for m in methods_balance_sheet %}
-                                                {% if m == selected_balance_sheet_method %}
-                                                <option selected>{{ m }}</option>
-                                                {% else %}
                                                 <option>{{ m }}</option>
-                                                {% endif %}
                                                 {% endfor %}
                                             </select>
                                         </div>
 
                                         <!-- Cash flow -->
                                         <div class="form-group my-2 align-self-end">
-                                            <label for="methods_cash_flow">Cash Flow</label>
+                                            <label for="methods_cash_flow"><i>Cash Flow</i></label>
                                             <select id="methods_cash_flow" name='methods_cash_flow'
                                                     class="form-control method-selector">
                                                 {% for m in methods_cash_flow %}
-                                                {% if m == selected_cash_flow_method %}
-                                                <option selected>{{ m }}</option>
-                                                {% else %}
                                                 <option>{{ m }}</option>
-                                                {% endif %}
                                                 {% endfor %}
                                             </select>
                                         </div>

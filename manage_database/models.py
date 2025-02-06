@@ -109,6 +109,7 @@ class Stock(models.Model):
     ipo_year = models.IntegerField(null=True)
     sector = models.CharField(max_length=255)
     industry = models.CharField(max_length=255)
+    market_cap = models.BigIntegerField(null=True)
 
     def __str__(self):
         return self.ticker

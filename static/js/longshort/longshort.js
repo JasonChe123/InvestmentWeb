@@ -192,7 +192,7 @@ $(document).ready(function () {
                 "Content-Type": "application/json",
                 'X-CSRFToken': csrfToken,
             },
-            data: JSON.stringify({"search_text": search_value}),
+            data: JSON.stringify({ "search_text": search_value }),
             success: function (data) {
                 searchResult.text("");
                 if (data.result.length > 0) {
@@ -334,8 +334,13 @@ $(document).ready(function () {
     exportButton.click(function () {
         basketTraderModal.hide();
 
-        // Extract table data
+        // Validate table data
         const longTables = $('.table-top');
+        if (longTables.length === 0) {
+            return;
+        }
+
+        // Extract table data
         let longTableData = [];
         for (let i = 0; i < longTables.length; i++) {
             longTableData.push(extractTableData(longTables[i]));
@@ -368,7 +373,9 @@ $(document).ready(function () {
             processData: false,
             contentType: false,
             success: function (response) {
-                loadingModal.hide();
+                setTimeout(function () {
+                    loadingModal.hide()
+                }, 500);
 
                 // Show important information
                 messageModalBody.text("Please carefully read the downloaded basket trader file, " +
@@ -377,7 +384,7 @@ $(document).ready(function () {
                 messageModal.show();
 
                 // Download the file
-                const blob = new Blob([response], {type: 'text/csv'});
+                const blob = new Blob([response], { type: 'text/csv' });
                 $('#message-modal').on('hidden.bs.modal', function () {
                     const url = window.URL.createObjectURL(blob);
                     $(`<a href="${url}" hidden download="basket_trader.csv"></a>`)[0].click()

@@ -46,6 +46,9 @@ $(document).ready(function () {
     }
 
     function modifySelectedMethod(method) {
+        if (method.includes("...")) {
+            return;
+        }
         /* Modify the 'Selected Method' from input-params. */
         // If the last string is +, -, *, /, (
         if (/[+\-*\/(]$/.test(selectedMethod.text())) {

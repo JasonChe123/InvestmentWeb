@@ -3,7 +3,7 @@
 {% block title %}Long Short{% endblock title %}
 
 {% block content %}
-
+<!-- Content -->
 <div>
     <!-- Modal (export basket trader) -->
     {% include 'long_short/export_basket_trader_modal.html' %}
@@ -36,9 +36,8 @@
             </ul>
         </div>
 
-        <div class="w-100 d-inline-flex gap-3">
             <!-- Summary table -->
-            <table class="table table-sm table-bordered table-hover w-75 custom-shadow">
+            <table class="table table-sm table-bordered table-hover custom-shadow">
                 <!-- Header -->
                 <tr>
                     <th></th>
@@ -74,12 +73,11 @@
             </table>
 
             <!-- Export button -->
-            <button class="btn btn-outline-primary h-50"
+            <button class="btn btn-primary h-50"
                     data-bs-toggle="modal"
                     data-bs-target="#basket-trader-modal">
-                Export Basket Trading File for IB Trader WorkStation
+                Export csv File
             </button>
-        </div>
     </div>
 
     <!-- Result by sector -->
@@ -97,30 +95,34 @@
                             role="tab"
                             aria-controls="content-{{ d.sector|slugify }}"
                             aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
-                        {{ d.sector }}
-                    </button>
+                        {{ d.sector }}</button>
                 </li>
                 {% endfor %}
             </ul>
 
             <!-- Content -->
-            <div class="tab-content custom-shadow" id="sectorTabsContent">
+            <div class="tab-content" id="sectorTabsContent">
                 {% for d in data %}
                 <div class="tab-pane fade {% if forloop.first %}show active{% endif %}"
                      id="content-{{ d.sector|slugify }}"
                      role="tabpanel"
                      aria-labelledby="tab-{{ d.sector|slugify }}">
-                    <div class="p-3 mb-5">
-                        <h5 class="mb-3">Sector - {{ d.sector }}</h5>
+                    <div class="p-3">
+                        <h5>Sector - {{ d.sector }}</h5>
+                        <ul>
+                            <li>
+                                (Value: {{ selected_method }})
+                            </li>
+                        </ul>
 
                         <!-- Top stocks -->
                         <div class="row">
-                            <label>
-                                Top {{ selected_pos_hold }} Stocks ( Total Performance
-                                <b class="{% if d.long_total < 0 %}text-danger{% endif %}">{{ d.long_total }}</b> )
-                            </label>
-
                             <div class="table-responsive">
+                                <label>
+                                    Top {{ selected_pos_hold }} Stocks ( Total Performance
+                                    <b class="{% if d.long_total < 0 %}text-danger{% endif %}">{{ d.long_total }}</b> )
+                                </label>
+
                                 <table class="table table-sm table-striped table-borderless border table-top">
                                     <!-- Header -->
                                     <tr>
@@ -150,17 +152,13 @@
                                     </tr>
                                     {% endfor %}
                                 </table>
-                            </div>
-                        </div>
+                                <br>
 
-                        <!-- Bottom stocks -->
-                        <div class="row">
-                            <label>
-                                Bottom {{ selected_pos_hold }} Stocks ( Total Performance
-                                <b class="{% if d.short_total < 0 %}text-danger{% endif %}">{{ d.short_total }}</b> )
-                            </label>
-
-                            <div class="table-responsive">
+                                <!-- Bottom stocks -->
+                                <label>
+                                    Bottom {{ selected_pos_hold }} Stocks ( Total Performance
+                                    <b class="{% if d.short_total < 0 %}text-danger{% endif %}">{{ d.short_total }}</b> )
+                                </label>
                                 <table class="table table-sm table-striped table-borderless border table-bottom">
                                     <!-- Header -->
                                     <tr>

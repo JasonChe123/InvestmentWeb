@@ -28,6 +28,7 @@ from manage_database.models import (
 
 import pdb
 
+
 market_cap = {
     "Mega (>$200B)": 200_000_000_000,
     "Large ($10B-$200B)": range(10_000_000_000, 200_000_000_001),
@@ -113,15 +114,9 @@ class BackTestView(View):
         )
 
         # # Initialize other parameters
-        self.ipo_years = [5, 4, 3, 2, 1]
         self.backtest_years = [i for i in range(1, 5)]
         self.pos_hold = [50, 40, 30, 20, 10]
         self.min_stock_price = [1, 2, 3, 4, 5, 10]
-        self.re_balancing_months = [
-            "Jan, Apr, Jul, Oct",
-            "Feb, May, Aug, Nov",
-            "Mar, Jun, Sep, Dec",
-        ]
         self.sectors = {k: 0 for k in sectors}
 
         # Setup html context
@@ -130,24 +125,20 @@ class BackTestView(View):
             "methods_balance_sheet": self.balance_sheet_data,
             "methods_cash_flow": self.cash_flow_data,
             "market_cap": self.market_cap.keys(),
-            "ipo_years": self.ipo_years,
             "sectors": self.sectors,
             "all_stocks_num": 0,
             "backtest_years": self.backtest_years,
             "pos_hold": self.pos_hold,
             "min_stock_price": self.min_stock_price,
-            "re_balancing_months": self.re_balancing_months,
         }
 
     def get(self, request):
         # Default parameters
         self.html_context["selected_market_cap"] = list(self.market_cap.keys())[:-1]
-        self.html_context["selected_ipo_years"] = 1
         self.html_context["selected_backtest_years"] = 1
         self.html_context["selected_pos_hold"] = 10
         self.html_context["selected_min_stock_price"] = 10
-        self.html_context["selected_re_balancing_months"] = self.re_balancing_months[1]
-        self.html_context["selected_ranking_method"] = "Descending"
+        self.html_context["selected_sorting_method"] = "Descending"
         self.html_context["csrf_token"] = csrf(request)["csrf_token"]
 
         return render(request, "long_short/index.html", self.html_context)
@@ -156,26 +147,22 @@ class BackTestView(View):
         # Get user's parameters
         market_cap = request.POST.getlist("market-cap")
         method = request.POST.get("selected-method").rstrip("+-*/")
-        ipo_years = int(request.POST.get("ipo_years"))
         sectors = [s for s in self.sectors if request.POST.get(s)]
         backtest_years = float(request.POST.get("backtest_years"))
         pos_hold = int(request.POST.get("pos_hold"))
         min_stock_price = float(request.POST.get("min_stock_price"))
-        re_balancing_months = request.POST.get("re_balancing_months")
-        ranking_method = request.POST.get("ranking_method")
+        sorting_method = request.POST.get("sorting_method")
 
         # Add to context
         self.html_context.update(
             {
                 "selected_market_cap": market_cap,
                 "selected_method": method,
-                "selected_ipo_years": ipo_years,
                 "selected_sectors": sectors,
                 "selected_backtest_years": backtest_years,
                 "selected_pos_hold": pos_hold,
                 "selected_min_stock_price": min_stock_price,
-                "selected_re_balancing_months": re_balancing_months,
-                "selected_ranking_method": ranking_method,
+                "selected_sorting_method": sorting_method,
             }
         )
 
@@ -201,14 +188,12 @@ class BackTestView(View):
                     self.start_backtest,
                     request,
                     market_cap,
-                    ipo_years,
                     sector,
                     method,
                     backtest_years,
                     pos_hold,
                     min_stock_price,
-                    re_balancing_months,
-                    ranking_method,
+                    sorting_method,
                 )
 
         # Sort result by sector
@@ -226,32 +211,28 @@ class BackTestView(View):
         self.html_context["longshort_annualized"] = round(
             self.longshort_annualized / len(sectors), 2
         )
-
+        
         return render(request, "long_short/index.html", self.html_context)
 
     def start_backtest(
         self,
         request,
         market_cap,
-        ipo_years,
         sector,
         method,
         backtest_years,
         pos_hold,
         min_stock_price,
-        re_balancing_months,
-        ranking_method,
+        sorting_method,
     ):
         # Get US stocks
-        df_us_stocks = get_us_stocks(market_cap, ipo_years, sector)
+        df_us_stocks = get_us_stocks(market_cap, sector)
         if len(df_us_stocks) == 0 and not messages.get_messages(request):
             messages.warning(request, "No stocks found, please adjust your filter.")
             return
 
         # Get re-balancing dates
-        l_re_balancing_dates = get_re_balancing_dates(
-            re_balancing_months, backtest_years
-        )
+        l_re_balancing_dates = get_re_balancing_dates(backtest_years)
 
         # Get result by method chose
         results = get_result_from_method(
@@ -265,7 +246,7 @@ class BackTestView(View):
         )
 
         # Ranking and split results
-        result_subset = ranking(results, ranking_method, min_stock_price)
+        result_subset = ranking(results, sorting_method, min_stock_price)
 
         # Get performance for each re-balancing date
         df_top, df_bottom = get_performance(result_subset, pos_hold)
@@ -349,7 +330,6 @@ def separate_words(string: str) -> str:
 
 def get_us_stocks(
     market_cap_filter: list = [],
-    min_ipo_years: int = 0,
     sector_filter: str | list = None,
 ) -> pd.DataFrame:
     """
@@ -407,7 +387,6 @@ def get_us_stocks(
     results = Stock.objects.filter(
         (mega_q | large_q | medium_q | small_q | micro_q | nano_q),
         sector_q,
-        ipo_year__lte=dt.datetime.today().year - min_ipo_years,
         ticker__regex=r"^[a-zA-Z]{1,4}$",
     )
 
@@ -418,14 +397,13 @@ def get_us_stocks(
     return results
 
 
-def get_re_balancing_dates(re_balancing_months: str, backtest_years: float = 1) -> list:
-    # todo: testing for every months
+def get_re_balancing_dates(backtest_years: float = 1) -> list:
     this_month = dt.datetime.now(tz=dt.timezone.utc).replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
     date = (this_month - dt.timedelta(days=365 * backtest_years)).replace(day=1)
     l_dates = []
-    while date < this_month:
+    while date <= this_month:
         l_dates.append(date)
         date = (date + dt.timedelta(days=31)).replace(day=1)
 
@@ -561,9 +539,9 @@ def apply_formula(df: pd.DataFrame, formula: str, result_col_name: str) -> pd.Da
     return df
 
 
-def ranking(results: pd.DataFrame, ranking_method: str, min_stock_price: float) -> dict:
+def ranking(results: pd.DataFrame, sorting_method: str, min_stock_price: float) -> dict:
     seperated_results = {}
-    ascending = True if ranking_method == "Ascending" else False
+    ascending = True if sorting_method == "Ascending" else False
     for col in results.columns:
         if col == "stock__ticker":
             continue
@@ -597,6 +575,8 @@ def get_performance(
             stock__ticker__in=ticker_list,
             date__gte=start_date,
             date__lte=end_date,
+            open__gt=0,
+            adj_close__gt=0,
         ).order_by("-date")
 
         # Create candlesticks
@@ -605,7 +585,6 @@ def get_performance(
         )
 
         # Calculate performance
-        df_prices = df_prices.replace(0, 0.01)
         performance = (
             df_prices.groupby("stock__ticker")
             .apply(

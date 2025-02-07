@@ -1,6 +1,6 @@
 $(document).ready(function () {
     // Theme toggling
-    const themeToggle = $('#theme-toggle');
+    const themeToggle = $('.theme-toggle');
     const icon = themeToggle.find('i');
     const themeText = themeToggle.find('label')
     const htmlElement = $('html');
@@ -21,7 +21,7 @@ $(document).ready(function () {
             if (chart) {
                 chart.updateOptions({
                     theme: {
-                        mode: isDark? 'dark' : 'light'
+                        mode: isDark ? 'dark' : 'light'
                     }
                 });
             }
@@ -33,5 +33,23 @@ $(document).ready(function () {
         const isDark = htmlElement.attr('data-bs-theme') === 'dark';
         setTheme(!isDark);
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    });
+
+    // Sidebar toggling
+    const sidebarToggleBtn = $('#sidebar-toggle-btn');
+    const sidebar = $('#sidebar');
+
+    sidebar.css({ "transition": "width 0.5s ease" });
+    sidebar.find("a").css({
+        "white-space": 'nowrap',
+    });
+    sidebarToggleBtn.click(function () {
+        if (sidebar.width() > 65) {
+            sidebar.width("65px");
+            sidebarToggleBtn.text(">");
+        } else {
+            sidebar.width("300px");
+            sidebarToggleBtn.text("<");
+        }
     });
 });

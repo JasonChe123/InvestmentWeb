@@ -1,5 +1,6 @@
 <!doctype html>
 {% load static %}
+
 <html lang="en" data-bs-theme="dark">
 <!-- Head -->
 <head>
@@ -36,80 +37,102 @@
 <body>
 <main>
     <!-- Sidebar -->
-    <div class="d-flex flex-column flex-shrink-0 p-3" style="width: 280px;">
-        <ul class="list-unstyled ps-0">
+    <div id="sidebar" class="sidebar" style="width: 300px; overflow: hidden;">
+        <ul class="list-unstyled ms-3">
+            <!-- todo: testing -->
+            <li class="m-2">
+                <button class="btn btn-outline-primary" id="sidebar-toggle-btn"><</button>
+            </li>
+            
             <!-- Home -->
-            <li class="mb-1">
-                <button class="btn align-items-center rounded collapsed" data-bs-toggle="collapse"
-                        data-bs-target="#home-collapse" aria-expanded="false">
-                    <i class="fas fa-home me-2"></i>Home
-                </button>
-                <div class="collapse" id="home-collapse">
-                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                        <li><a href="{% url 'us-economy' %}" class="rounded">Financial Weather</a></li>
-                    </ul>
+            <li class="d-flex align-items-center">
+                <button class="btn"><i class="fas fa-home" data-bs-toggle="collapse"
+                    data-bs-target="#home-collapse" aria-expanded="true"></i></button>
+                <a class="text-decoration-none ms-2" data-bs-toggle="collapse"
+                    data-bs-target="#home-collapse" aria-expanded="true"><b>Home</b></a>
+            </li>
+            <li class="d-flex align-items-center">
+                <div class="collapse ms-5" id="home-collapse">
+                <ul class="btn-toggle-nav list-unstyled">
+                    <li><a href="{% url 'us-economy' %}">Financial Weather</a></li>
+                </ul>
                 </div>
             </li>
 
             <!-- Dashboard -->
-            <li class="mb-1">
-                <button class="btn align-items-center rounded collapsed" data-bs-toggle="collapse"
-                        data-bs-target="#dashboard-collapse" aria-expanded="false">
-                    <i class="fas fa-mug-hot me-2"></i>Dashboard
-                </button>
-                <div class="collapse" id="dashboard-collapse">
-                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                        <li><a href="{% url 'performance' %}" class="rounded">Performance</a></li>
+            <li class="d-flex align-items-center">
+                <button class="btn"><i class="fas fa-mug-hot" data-bs-toggle="collapse"
+                    data-bs-target="#dashboard-collapse" aria-expanded="true"></i></button>
+                <a class="text-decoration-none ms-2" data-bs-toggle="collapse"
+                    data-bs-target="#dashboard-collapse" aria-expanded="true"><b>Dashboard</b></a>
+            </li>
+            <li class="d-flex align-items-center">
+                <div class="collapse ms-5" id="dashboard-collapse">
+                    <ul class="btn-toggle-nav list-unstyled">
+                        <li><a href="{% url 'performance' %}">Performance</a></li>
                     </ul>
                 </div>
             </li>
 
             <!-- Strategies -->
-            <li class="mb-1">
-                <button class="btn align-items-center rounded collapsed" data-bs-toggle="collapse"
-                        data-bs-target="#orders-collapse" aria-expanded="false">
-                    <i class="fas fa-hammer me-2"></i>Strategies Builder
-                </button>
-                <div class="collapse" id="orders-collapse">
-                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                        <li><a href="{% url 'longshort-backtest' %}" class="rounded">LongShort</a></li>
+            <li class="d-flex align-items-center">
+                <button class="btn"><i class="fas fa-hammer" data-bs-toggle="collapse"
+                    data-bs-target="#strategies-collapse" aria-expanded="true"></i></button>
+                <a class="text-decoration-none ms-2" data-bs-toggle="collapse"
+                    data-bs-target="#strategies-collapse" aria-expanded="true"><b>Strategies Builder</b></a>
+            </li>
+            <li class="d-flex align-items-center"></li>
+                <div class="collapse ms-5" id="strategies-collapse">
+                    <ul class="btn-toggle-nav list-unstyled">
+                        <li><a href="{% url 'longshort-backtest' %}">LongShort</a></li>
                     </ul>
                 </div>
             </li>
-            <li class="border-top my-3"></li>
 
-            <!-- Account -->
-            <li class="mb-1">
-                <button class="btn align-items-center rounded collapsed" data-bs-toggle="collapse"
-                        data-bs-target="#account-collapse" aria-expanded="false">
+            <!-- Separator -->
+            <hr class="mx-2">
+
+
+            <!-- Strategies -->
+            <li class="d-flex align-items-center">
+                <button class="btn"><i class="fas fa-user" data-bs-toggle="collapse"
+                    data-bs-target="#account-collapse" aria-expanded="true"></i></button>
+                <a class="text-decoration-none ms-2" data-bs-toggle="collapse"
+                    data-bs-target="#account-collapse" aria-expanded="true">
                     {% if user.is_authenticated %}
-                    <i class="fas fa-user me-2"></i>Account - {{ user.username }}
+                        <b>Account - {{ user.username }}</b>
                     {% else %}
-                    <i class="fas fa-user me-2"></i>Account
+                        <b>Account</b>
                     {% endif %}
-                </button>
-                <div class="collapse" id="account-collapse">
-                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                </a>
+            </li>
+            <li class="d-flex align-items-center"></li>
+                <div class="collapse ms-5" id="account-collapse">
+                    <ul class="btn-toggle-nav list-unstyled">
+                        <li>
                         {% if user.is_authenticated %}
-                        <li><a href="{% url 'account_logout' %}" class="rounded">Sign Out</a></li>
+                            <a href="{% url 'account_logout' %}">Sign Out</a>
                         {% else %}
-                        <li><a href="{% url 'account_login' %}" class="rounded">Sign In / Log In</a></li>
+                            <a href="{% url 'account_login' %}">Sign In/ Log In</a>
                         {% endif %}
+                        </li>
                     </ul>
                 </div>
             </li>
 
             <!-- Theme -->
-            <li class="mb-1">
-                <button id="theme-toggle" class="btn align-items-center rounded">
-                    <i class="fas fa-moon me-2"></i><label style="cursor: pointer;">Dark</label>
-                </button>
+            <li class="d-flex align-items-center">
+                <button class="btn theme-toggle">
+                    <i class="fas fa-moon"></i></button>
+                <a class="text-decoration-none ms-2 theme-toggle">
+                    <b>Dark</b></a>
             </li>
+            
         </ul>
     </div>
 
     <!-- Content -->
-    <div class="py-3 px-5 w-100" style="overflow-y: auto;">
+    <div class="p-3 w-100" style="overflow-y: auto;">
         {% include 'partials/_messages.html' %}
         {% block content %}
         <h1>Welcome To Investment Web</h1>

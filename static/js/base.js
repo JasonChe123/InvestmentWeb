@@ -38,7 +38,6 @@ $(document).ready(function () {
     // Sidebar toggling
     const sidebarToggleBtn = $('#sidebar-toggle-btn');
     const sidebar = $('#sidebar');
-
     sidebar.css({ "transition": "width 0.5s ease" });
     sidebar.find("a").css({
         "white-space": 'nowrap',

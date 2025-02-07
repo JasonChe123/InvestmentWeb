@@ -9,10 +9,11 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST, require_GET
 import json
 import logging
+from manage_database.models import Stock, CandleStick
 import numpy as np
 import pandas as pd
-from manage_database.models import Stock, CandleStick
 from .models import Portfolio
+from typing import Tuple
 
 
 @login_required
@@ -26,21 +27,27 @@ def home(request):
     # Consolidate data
     grouped_portfolio = {}
     # {
-    #  'group_name': [{'financial_instrument': '',
+    #  'group_name': {'created_on': ''},
+    #                 'data': [
+    #                 {'financial_instrument': '',
     #                  'position': 0,
     #                  'avg_price': 0,
     #                  'last_price': 0,
     #                  'performance_percentage': 0
-    #                  }, ...],
-    # 'group_name': [{...}, {...}, ...]
+    #                  }, ...]
+    #                },
+    # 'group_name': {'created_on': '', 'data': [{...}, {...}, ...]}
     # }
     for port in portfolio:
         # Create group
         if port.group_name not in grouped_portfolio:
-            grouped_portfolio[port.group_name] = []
+            grouped_portfolio[port.group_name] = {
+                'created_on': port.created_at,
+                'data': []
+            }
 
-        # Append data
-        grouped_portfolio[port.group_name].append({
+        # Append datac
+        grouped_portfolio[port.group_name]['data'].append({
             'financial_instrument': port.financial_instrument,
             'position': port.position,
             'avg_price': port.avg_price,
@@ -51,7 +58,7 @@ def home(request):
     # Prepare context
     processed_portfolio = []
     for group_name, data in grouped_portfolio.items():
-        df_portfolio = pd.DataFrame(data)
+        df_portfolio = pd.DataFrame(data['data'])
         df_positive, df_negative, mean_positive, mean_negative = data_cleaning(df_portfolio)
         df_negative['Cost'] = abs(df_negative['Cost'])
         init_cost_positive = int(df_positive['Cost'].sum())
@@ -64,7 +71,7 @@ def home(request):
         # Append to processed portfolio
         processed_portfolio.append({
             'group_name': group_name,
-            'created': dt.datetime.strftime(port.created_at, '%d %b %Y'),
+            'created': dt.datetime.strftime(data['created_on'], '%d %b %Y'),
             'last_update': None,
             'positive': {
                 'df': df_positive,
@@ -278,7 +285,7 @@ def get_portfolio(request) -> pd.DataFrame:
     return portfolio
 
 
-def get_upload_portfolio(request) -> (str, pd.DataFrame):
+def get_upload_portfolio(request) -> Tuple[str, pd.DataFrame]:
     uploaded_file = request.FILES.get('portfolio_file')
     # Empty file
     try:

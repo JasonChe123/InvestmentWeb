@@ -94,6 +94,16 @@ $(document).ready(function () {
         }
     }
 
+    // Format total_performance
+    const totalPerf = $(".total-performance");
+    totalPerf.text(function(_, orgText){
+        if (parseFloat(orgText) < 0) {
+            return `( ${orgText.replace("-", "")} % )`
+        } else {
+            return `+ ${orgText} %`
+        }
+    });
+
     // Back button
     backButton.click(function () {
         window.history.back();

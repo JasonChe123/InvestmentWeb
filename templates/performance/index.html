@@ -8,152 +8,6 @@
 <!-- Modal (loading) -->
 {% include 'partials/_loading_modal.html' %}
 
-<!-- Add portfolio -->
-<div class="my-3 text-end">
-    <form method="GET" action="{% url 'add_portfolio' %}">
-        <button class="btn btn-primary" style="width: 100px;">
-            <b><i class="fas fa-plus-circle me-2"></i>Add</b>
-        </button>
-    </form>
-</div>
-
-<!-- Show portfolio -->
-{% for data in portfolio %}
-<div class="card-body p-3 mb-5 rounded custom-shadow">
-    <!-- Header -->
-    <div class="p-3">
-        <div class="row">
-
-            <!-- Info -->
-            <div class="col-9">
-                <table class="table table-borderless">
-                    <tr>
-                        <th class="w-25">Group Name</th>
-                        <td class="w-75">{{ data.group_name }}</td>
-                    </tr>
-                    <tr>
-                        <th class="w-25">Created on</th>
-                        <td class="w-75">{{ data.created }}</td>
-                    </tr>
-                    <tr>
-                        <th class="w-25">Performance</th>
-                        <td class="w-75">{{ data.total_performance }}%</td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- Control buttons -->
-            <div class="col-3 text-end">
-                <button class="btn btn-outline-secondary mx-1" value="{{ data.group_name }}" name="edit"
-                        style="width: 100px;">Edit
-                </button>
-                <button class="btn btn-outline-danger mx-1" value="{{ data.group_name }}" name="delete"
-                        style="width: 100px;">Delete
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Details of portfolio -->
-    <div class="row">
-        <!-- Positive position -->
-        <div class="col-sm-6 p-3">
-            <!-- Header -->
-            <h6><i>Positive Position ({{ data.positive.no_of_stocks }} stocks)</i></h6>
-            <div class="table-responsive">
-                <table class="table table-sm table-striped table-bordered">
-                    <tr>
-                        <th class="text-center">Initial Cost</th>
-                        <th class="text-center">Average Perf (%)</th>
-                        <th class="text-center">Profit ($)</th>
-                    </tr>
-                    <tr>
-                        <td class="text-end">{{ data.positive.initial_cost|intcomma }}</td>
-                        <td class="text-end">{{ data.positive.mean_performance|intcomma }}</td>
-                        <td class="text-end">{{ data.positive.profit|intcomma }}</td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- Breakdown tables -->
-            <div class="table-responsive">
-                <table class="table table-sm table-striped table-bordered">
-                    <!-- Table header -->
-                    <tr>
-                        {% for col in data.positive.df.columns %}
-                        <th class="text-center">{{ col }}</th>
-                        {% endfor %}
-                    </tr>
-                    <!-- Table data -->
-                    {% for i, row in data.positive.df.iterrows %}
-                    <tr>
-                        {% for cell in row %}
-                        <!-- Is a number -->
-                        {% if cell|floatformat:"2" %}
-                        <td class="text-end">{{ cell|floatformat:"2"|intcomma }}</td>
-
-                        <!-- Is not a number -->
-                        {% else %}
-                        <td>{{ cell }}</td>
-                        {% endif %}
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-        </div>
-
-        <!-- Negative position -->
-        <div class="col-sm-6 p-3">
-            <!-- Header -->
-            <h6 class="text-danger"><i>Negative Position ({{ data.negative.no_of_stocks }} stocks)</i></h6>
-            <div class="table-responsive">
-                <table class="table table-sm table-striped table-bordered">
-                    <tr>
-                        <th class="text-center">Initial Cost</th>
-                        <th class="text-center">Average Perf (%)</th>
-                        <th class="text-center">Profit ($)</th>
-                    </tr>
-                    <tr>
-                        <td class="text-end">{{ data.negative.initial_cost|intcomma }}</td>
-                        <td class="text-end">{{ data.negative.mean_performance|intcomma }}</td>
-                        <td class="text-end">{{ data.negative.profit|intcomma }}</td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- Breakdown tables -->
-            <div class="table-responsive">
-                <table class="table table-sm table-striped table-bordered">
-                    <!-- Table header -->
-                    <tr>
-                        {% for col in data.negative.df.columns %}
-                        <th class="text-center">{{ col }}</th>
-                        {% endfor %}
-                    </tr>
-                    <!-- Table data -->
-                    {% for i, row in data.negative.df.iterrows %}
-                    <tr>
-                        {% for cell in row %}
-
-                        <!-- Is a number -->
-                        {% if cell|floatformat:"2" %}
-                        <td class="text-end">{{ cell|floatformat:"2"|intcomma }}</td>
-
-                        <!-- Is not a number -->
-                        {% else %}
-                        <td>{{ cell }}</td>
-                        {% endif %}
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-{% endfor %}
-
 <!-- Confirmation Modal -->
 <div class="modal fade" id="confirmation-modal" tabindex="-1" aria-labelledby="confirmation-modal-label"
      aria-hidden="true">
@@ -193,6 +47,162 @@
         </div>
     </div>
 </div>
+
+<!-- Add portfolio button-->
+<div class="my-3 text-end">
+    <form method="GET" action="{% url 'add_portfolio' %}">
+        <button class="btn btn-primary" style="width: 100px;">
+            <b><i class="fas fa-plus-circle me-2"></i>Add</b>
+        </button>
+    </form>
+</div>
+
+<!-- Portfolio Info -->
+{% for data in portfolio %}
+<div class="card m-5">
+    <div class="card-header">
+        <div class="row">
+            <div class="col-md-2">
+                <label>Group Name</label>
+            </div>
+            <div class="col-md-2">
+                <b>{{ data.group_name }}</b>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-2">
+                <label>Created On</label>
+            </div>
+            <div class="col-md-2">
+                <b>{{ data.created }}</b>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-2">
+                <label>Performance</label>
+            </div>
+            <div class="col-md-2">
+                {% if data.total_performance < 0 %}
+                    <b class="total-performance text-danger">{{ data.total_performance }}</b>
+                {% else %}
+                    <b class="total-performance">{{ data.total_performance }}</b>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-3 mb-5">
+        <div class="row d-flex">
+            <!-- Control buttons -->
+            <div class="col-3 text-end d-flex">
+                <button class="btn btn-outline-secondary m-1" value="{{ data.group_name }}" name="edit"
+                        style="width: 100px;">Edit
+                </button>
+                <button class="btn btn-outline-danger m-1" value="{{ data.group_name }}" name="delete"
+                        style="width: 100px;">Delete
+                </button>
+            </div>
+        </div>
+
+        <!-- Details of portfolio -->
+        <div class="row">
+            <!-- Positive position -->
+            <div class="col-sm-6 p-3">
+                <!-- Header -->
+                <h6><i>Positive Position ({{ data.positive.no_of_stocks }} stocks)</i></h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped table-bordered">
+                        <tr>
+                            <th class="text-center">Initial Cost</th>
+                            <th class="text-center">Average Perf (%)</th>
+                            <th class="text-center">Profit ($)</th>
+                        </tr>
+                        <tr>
+                            <td class="text-end">{{ data.positive.initial_cost|intcomma }}</td>
+                            <td class="text-end">{{ data.positive.mean_performance|intcomma }}</td>
+                            <td class="text-end">{{ data.positive.profit|intcomma }}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Breakdown tables -->
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped table-bordered">
+                        <!-- Table header -->
+                        <tr>
+                            {% for col in data.positive.df.columns %}
+                            <th class="text-center">{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                        <!-- Table data -->
+                        {% for i, row in data.positive.df.iterrows %}
+                        <tr>
+                            {% for cell in row %}
+                            <!-- Is a number -->
+                            {% if cell|floatformat:"2" %}
+                            <td class="text-end">{{ cell|floatformat:"2"|intcomma }}</td>
+
+                            <!-- Is not a number -->
+                            {% else %}
+                            <td>{{ cell }}</td>
+                            {% endif %}
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- Negative position -->
+            <div class="col-sm-6 p-3">
+                <!-- Header -->
+                <h6 class="text-danger"><i>Negative Position ({{ data.negative.no_of_stocks }} stocks)</i></h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped table-bordered">
+                        <tr>
+                            <th class="text-center">Initial Cost</th>
+                            <th class="text-center">Average Perf (%)</th>
+                            <th class="text-center">Profit ($)</th>
+                        </tr>
+                        <tr>
+                            <td class="text-end">{{ data.negative.initial_cost|intcomma }}</td>
+                            <td class="text-end">{{ data.negative.mean_performance|intcomma }}</td>
+                            <td class="text-end">{{ data.negative.profit|intcomma }}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Breakdown tables -->
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped table-bordered">
+                        <!-- Table header -->
+                        <tr>
+                            {% for col in data.negative.df.columns %}
+                            <th class="text-center">{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                        <!-- Table data -->
+                        {% for i, row in data.negative.df.iterrows %}
+                        <tr>
+                            {% for cell in row %}
+
+                            <!-- Is a number -->
+                            {% if cell|floatformat:"2" %}
+                            <td class="text-end">{{ cell|floatformat:"2"|intcomma }}</td>
+
+                            <!-- Is not a number -->
+                            {% else %}
+                            <td>{{ cell }}</td>
+                            {% endif %}
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 
 <!-- Script -->
 <script src="{% static 'js/performance/performance.js' %}"

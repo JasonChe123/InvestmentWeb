@@ -14,7 +14,7 @@ $(document).ready(function () {
     const messageModalBody = $('#message-modal-body');
     const loadingModal = new bootstrap.Modal($('#loading-modal'));
     const searchField = $('#search-field');
-    const searchResult = $('#search-result');
+    const searchResult = $('#method-dropdown-menu');
     const selectedMethod = $('#selected-method');
     const selectedMethodInput = $('#selected-method-input');
     const tables = $('table');
@@ -133,9 +133,7 @@ $(document).ready(function () {
         })
     }
 
-    // Hide result first
-    searchResult.hide();
-
+    // Initialize stock number for market cap and sectors
     updateStockNum();
 
     // 'All' checkbox event
@@ -184,8 +182,25 @@ $(document).ready(function () {
         }
     }
 
-    // Ajax: search for backtest parameters
+    // Focus on search-field after clicked
+    $('#search-dropdown').on("click", function (e) {
+        e.preventDefault();
+        searchResult.hide();
+        searchField.focus();
+    });
+    
+    // SearchField event
     searchField.keyup(function (event) {
+        // Arrow-key-down -> navigate dropdown-menu
+        if (event.keyCode === 40) {
+            if (searchResult.find("a").length > 0) {
+                searchResult.show();
+                searchResult.find("a")[0].focus();
+                return;
+            }
+        }
+        
+        // Ajax: search report data names
         const search_value = event.target.value;
         $.ajax({
             url: 'search-method',
@@ -197,27 +212,33 @@ $(document).ready(function () {
             },
             data: JSON.stringify({ "search_text": search_value }),
             success: function (data) {
+                // Reset result
                 searchResult.text("");
-                if (data.result.length > 0) {
-                    searchResult.show();
 
+                if (data.result.length > 0) {
                     // Add results
                     for (let i = 0; i < data.result.length; i++) {
-                        const link = $('<a class="dropdown-item"></a>').text(data.result[i]);
+                        // Create dropdown-item
+                        let link = $('<li><a class="dropdown-item" href="#"></a></li>');
+                        link.find("a").text(data.result[i]);
                         searchResult.append(link);
 
-                        // Add to "Selected Method"
-                        link.click(function () {
+                        // Click event -> add to "Selected Method"
+                        link.find("a").click(function () {
                             modifySelectedMethod(data.result[i]);
 
                             // Initialize the search field
                             searchField.val("");
                             searchResult.text("");
                             searchResult.hide();
+
+                            searchResult.hide();
+                            searchField.focus();
                         });
                     }
+                    searchResult.show()
                 } else {
-                    searchResult.hide();
+                    searchResult.hide()
                 }
             },
             error: function (xhr, status, error) {

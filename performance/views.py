@@ -16,6 +16,9 @@ from .models import Portfolio
 from typing import Tuple
 
 
+import pdb
+
+
 @login_required
 @require_GET
 def home(request):
@@ -59,12 +62,20 @@ def home(request):
     processed_portfolio = []
     for group_name, data in grouped_portfolio.items():
         df_portfolio = pd.DataFrame(data['data'])
+
+        # Set default average prices
+        if request.GET.get("default_open_prices") == "Open Prices":
+            df_portfolio = set_default_average_prices(df_portfolio, data['created_on'])
+            context = {'default_prices': "open"}
+        else:
+            context = {'default_prices': "real"}
+
         df_positive, df_negative, mean_positive, mean_negative = data_cleaning(df_portfolio)
         df_negative['Cost'] = abs(df_negative['Cost'])
         init_cost_positive = int(df_positive['Cost'].sum())
         init_cost_negative = int(df_negative['Cost'].sum())
-        df_positive = df_positive.replace(np.nan, "")
-        df_negative = df_negative.replace(np.nan, "")
+        df_positive = df_positive.replace(np.nan, 0)
+        df_negative = df_negative.replace(np.nan, 0)
         total_performance = round((df_positive['Profit'].sum() + df_negative['Profit'].sum()) /
                                   (init_cost_positive + init_cost_negative) * 100, 2)
 
@@ -90,7 +101,7 @@ def home(request):
             'total_performance': total_performance,
         })
 
-    context = {'portfolio': processed_portfolio}
+    context['portfolio'] = processed_portfolio
 
     return render(request, 'performance/index.html', context)
 
@@ -420,3 +431,39 @@ def get_mean_performance(portfolio: pd.DataFrame) -> float:
     mean = portfolio['Profit'].sum() / portfolio['Cost'].sum() * 100
 
     return round(mean, 2)
+
+
+def set_default_average_prices(df_portfolio: pd.DataFrame, ref_date: dt.datetime) -> pd.DataFrame:
+    """
+    Set average prices of df_portfolio as the open prices of ref_date.
+    """
+    df = df_portfolio.copy()
+    stock_list = df["financial_instrument"].tolist()
+
+    # Get candlesticks data
+    query_res = CandleStick.objects.filter(
+        stock__ticker__in=stock_list,
+        date__lte=ref_date
+    ).order_by("-date")
+
+    # Create candlesticks dataframe
+    df_candlesticks = pd.DataFrame(
+        query_res.values(
+            "stock__ticker",
+            "date",
+            "open",
+        )
+    ).drop_duplicates(subset="stock__ticker")
+    
+    # Rename columns to match df_portfolio
+    df_candlesticks.rename(
+        columns={"stock__ticker": "financial_instrument",
+                 "open": "avg_price"}, inplace=True)
+    
+    # Drop 'avg_price' column in df_portfolio
+    df.drop(columns=["avg_price"], inplace=True)
+
+    # Merge df_portfolio and df_candlesticks
+    df = pd.merge(df, df_candlesticks[["financial_instrument", "avg_price"]], on="financial_instrument", how="left")
+
+    return df

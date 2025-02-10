@@ -24,7 +24,6 @@
     <script src="{% static 'js/apexcharts.min.js' %}" type="module"></script>
     <!--    <script src="{% static 'js/apexcharts2.js' %}" type="module"></script>-->
 
-
     <!-- Others -->
     <link rel="stylesheet" href="{% static 'css/sidebars.css' %}">
     <link rel="stylesheet" href="{% static 'css/social_account.css' %}">
@@ -37,23 +36,26 @@
 <body>
 <main>
     <!-- Sidebar -->
-    <div id="sidebar" class="sidebar" style="width: 65px; min-width: 65px; overflow: hidden;">
+    <div id="sidebar" class="sidebar" style="width: 60px; min-width: 60px; overflow: hidden;">
         <ul class="list-unstyled ms-3">
             <!-- Expand/Collapse button -->
             <li class="m-2">
-                <button class="btn btn-outline-primary" id="sidebar-toggle-btn"> > </button>
+                <button class="btn btn-outline-primary ms-0" id="sidebar-toggle-btn"> > </button>
             </li>
             
             <!-- Home -->
             <li class="d-flex align-items-center">
-                <button class="btn"><i class="fas fa-home" data-bs-toggle="collapse"
-                    data-bs-target="#home-collapse" aria-expanded="true"
-                    style="width: 25px;"></i></button>
-                <a class="text-decoration-none ms-2" data-bs-toggle="collapse"
+                <button class="btn" data-bs-toggle="collapse" 
+                    data-bs-target="#home-collapse" aria-expanded="false" style="width: 40px;">
+                    <i class="fas fa-home"></i>
+                </button>
+                <a class="text-decoration-none ms-2 w-100" data-bs-toggle="collapse"
                     data-bs-target="#home-collapse" aria-expanded="true"><b>Home</b></a>
             </li>
+            
+            <!-- Home > submenu -->
             <li class="d-flex align-items-center">
-                <div class="collapse ms-5" id="home-collapse">
+                <div class="collapse ms-4" id="home-collapse">
                 <ul class="btn-toggle-nav list-unstyled">
                     <li><a href="{% url 'us-economy' %}">Financial Weather</a></li>
                 </ul>
@@ -62,14 +64,17 @@
 
             <!-- Dashboard -->
             <li class="d-flex align-items-center">
-                <button class="btn"><i class="fas fa-mug-hot" data-bs-toggle="collapse"
-                    data-bs-target="#dashboard-collapse" aria-expanded="true"
-                    style="width: 25px;"></i></button>
-                <a class="text-decoration-none ms-2" data-bs-toggle="collapse"
+                <button class="btn" data-bs-toggle="collapse" 
+                    data-bs-target="#dashboard-collapse" aria-expanded="false" style="width: 40px;">
+                    <i class="fas fa-mug-hot"></i>
+                </button>
+                <a class="text-decoration-none ms-2 w-100" data-bs-toggle="collapse"
                     data-bs-target="#dashboard-collapse" aria-expanded="true"><b>Dashboard</b></a>
             </li>
+
+            <!-- Dashboard > submenu -->
             <li class="d-flex align-items-center">
-                <div class="collapse ms-5" id="dashboard-collapse">
+                <div class="collapse ms-4" id="dashboard-collapse">
                     <ul class="btn-toggle-nav list-unstyled">
                         <li><a href="{% url 'performance' %}">Performance</a></li>
                     </ul>
@@ -78,14 +83,17 @@
 
             <!-- Strategies -->
             <li class="d-flex align-items-center">
-                <button class="btn"><i class="fas fa-hammer" data-bs-toggle="collapse"
-                    data-bs-target="#strategies-collapse" aria-expanded="true"
-                    style="width: 25px;"></i></button>
-                <a class="text-decoration-none ms-2" data-bs-toggle="collapse"
+                <button class="btn" data-bs-toggle="collapse" 
+                    data-bs-target="#strategies-collapse" aria-expanded="false" style="width: 40px;">
+                    <i class="fas fa-hammer"></i>
+                </button>
+                <a class="text-decoration-none ms-2 w-100" data-bs-toggle="collapse"
                     data-bs-target="#strategies-collapse" aria-expanded="true"><b>Strategies Builder</b></a>
             </li>
+
+            <!-- Strategies > submenu -->
             <li class="d-flex align-items-center"></li>
-                <div class="collapse ms-5" id="strategies-collapse">
+                <div class="collapse ms-4" id="strategies-collapse">
                     <ul class="btn-toggle-nav list-unstyled">
                         <li><a href="{% url 'longshort-backtest' %}">LongShort</a></li>
                     </ul>
@@ -98,10 +106,11 @@
 
             <!-- Account -->
             <li class="d-flex align-items-center">
-                <button class="btn"><i class="fas fa-user" data-bs-toggle="collapse"
-                    data-bs-target="#account-collapse" aria-expanded="true"
-                    style="width: 25px;"></i></button>
-                <a class="text-decoration-none ms-2" data-bs-toggle="collapse"
+                <button class="btn" data-bs-toggle="collapse" 
+                    data-bs-target="#account-collapse" aria-expanded="false" style="width: 40px;">
+                    <i class="fas fa-user"></i>
+                </button>
+                <a class="text-decoration-none ms-2 w-100" data-bs-toggle="collapse"
                     data-bs-target="#account-collapse" aria-expanded="true">
                     {% if user.is_authenticated %}
                         <b>Account - {{ user.username }}</b>
@@ -110,8 +119,10 @@
                     {% endif %}
                 </a>
             </li>
+
+            <!-- Account > submenu -->
             <li class="d-flex align-items-center"></li>
-                <div class="collapse ms-5" id="account-collapse">
+                <div class="collapse ms-4" id="account-collapse">
                     <ul class="btn-toggle-nav list-unstyled">
                         <li>
                         {% if user.is_authenticated %}
@@ -124,11 +135,12 @@
                 </div>
             </li>
 
-            <!-- Theme -->
+            <!-- Theme toggling -->
             <li class="d-flex align-items-center">
-                <button class="btn"><i class="fas fa-moon" style="width: 25px;"></i></button>
-                <!-- <button class="btn theme-toggle" style="width: 25px;"><i class="fas fa-moon"></i></button> -->
-                <a class="text-decoration-none ms-2 theme-toggle"><b>Dark</b></a>
+                <button class="btn theme-toggle" style="width: 40px;">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <a class="text-decoration-none ms-2 theme-toggle w-100"><b>Dark</b></a>
             </li>
             
         </ul>

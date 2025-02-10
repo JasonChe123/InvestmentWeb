@@ -4,6 +4,8 @@ $(document).ready(function () {
     const icon = themeToggle.find('i');
     const themeText = themeToggle.find('b')
     const htmlElement = $('html');
+    const sidebarToggleBtn = $('#sidebar-toggle-btn');
+    const sidebar = $('#sidebar');
 
     let theme = localStorage.getItem('theme');
     setTheme(theme === 'light');
@@ -35,20 +37,29 @@ $(document).ready(function () {
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
     });
 
+    // Toogle sidebar
+    function toggleSidebar() {
+        if (sidebar.width() > 60) {
+            sidebar.width("60px");
+            sidebarToggleBtn.text(">");
+        } else {
+            sidebar.width("300px");
+            sidebarToggleBtn.text("<");
+        }
+    }
+
     // Sidebar toggling
-    const sidebarToggleBtn = $('#sidebar-toggle-btn');
-    const sidebar = $('#sidebar');
     sidebar.css({ "transition": "width 0.5s ease" });
     sidebar.find("a").css({
         "white-space": 'nowrap',
     });
     sidebarToggleBtn.click(function () {
-        if (sidebar.width() > 65) {
-            sidebar.width("65px");
-            sidebarToggleBtn.text(">");
-        } else {
-            sidebar.width("300px");
-            sidebarToggleBtn.text("<");
+        toggleSidebar();
+    });
+    sidebar.find("button").click(function () {
+        console.log(sidebar.width());
+        if (!(sidebar.width() > 60)) {
+            toggleSidebar();
         }
     });
 });

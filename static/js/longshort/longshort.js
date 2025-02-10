@@ -182,14 +182,12 @@ $(document).ready(function () {
         }
     }
 
-    // Focus on search-field after clicked
-    $('#search-dropdown').on("click", function (e) {
-        e.preventDefault();
-        searchResult.hide();
-        searchField.focus();
+    // Re-toggle dropdown-menu (colapse it)
+    searchField.on("click", function (e) {
+        searchField.dropdown("toggle");
     });
-    
-    // SearchField event
+
+    // Search-method event
     searchField.keyup(function (event) {
         // Arrow-key-down -> navigate dropdown-menu
         if (event.keyCode === 40) {
@@ -213,7 +211,7 @@ $(document).ready(function () {
             data: JSON.stringify({ "search_text": search_value }),
             success: function (data) {
                 // Reset result
-                searchResult.text("");
+                searchResult.empty();
 
                 if (data.result.length > 0) {
                     // Add results
@@ -228,8 +226,9 @@ $(document).ready(function () {
                             modifySelectedMethod(data.result[i]);
 
                             // Initialize the search field
+                            searchResult.empty();
+                            searchResult.hide();
                             searchField.val("");
-                            searchResult.text("");
                             searchField.focus();
                         });
                     }
@@ -239,7 +238,7 @@ $(document).ready(function () {
                 }
             },
             error: function (xhr, status, error) {
-                searchResult.text("");
+                searchResult.empty();
                 searchResult.hide();
             }
         })

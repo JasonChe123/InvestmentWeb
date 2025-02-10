@@ -2,7 +2,7 @@ $(document).ready(function () {
     // Theme toggling
     const themeToggle = $('.theme-toggle');
     const icon = themeToggle.find('i');
-    const themeText = themeToggle.find('label')
+    const themeText = themeToggle.find('b')
     const htmlElement = $('html');
 
     let theme = localStorage.getItem('theme');

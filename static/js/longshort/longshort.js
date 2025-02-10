@@ -230,9 +230,6 @@ $(document).ready(function () {
                             // Initialize the search field
                             searchField.val("");
                             searchResult.text("");
-                            searchResult.hide();
-
-                            searchResult.hide();
                             searchField.focus();
                         });
                     }

@@ -498,7 +498,7 @@ def get_result_from_method(
             values[["stock__ticker", column_name]], how="left", on="stock__ticker"
         )
 
-    return result_df.replace(np.nan, 0).replace(np.inf, 0)
+    return result_df.replace(np.nan, 0).replace(np.inf, 0).replace(-np.inf, 0)
 
 
 def merge_report(

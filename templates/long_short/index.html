@@ -56,19 +56,19 @@
                 <!-- Data -->
                 {% for d in data %}
                 <tr>
-                    <th>{{ d.sector }}</th>
-                    <td>{{ d.long_total }}%</td>
-                    <td>{{ d.short_total }}%</td>
-                    <td>{{ d.longshort_total }}%</td>
-                    <td>{{ d.longshort_annualized }}%</td>
+                    <th class="summary">{{ d.sector }}</th>
+                    <td class="summary">{{ d.long_total }}%</td>
+                    <td class="summary">{{ d.short_total }}%</td>
+                    <td class="summary">{{ d.longshort_total }}%</td>
+                    <td class="summary">{{ d.longshort_annualized }}%</td>
                 </tr>
                 {% endfor %}
                 <tr class="bg-primary-subtle">
-                    <th class="bg-primary-subtle">Total</th>
-                    <td class="bg-primary-subtle">{{ long_total }}%</td>
-                    <td class="bg-primary-subtle">{{ short_total }}%</td>
-                    <td class="bg-primary-subtle">{{ longshort_total }}%</td>
-                    <td class="bg-primary-subtle">{{ longshort_annualized }}%</td>
+                    <th class="summary bg-primary-subtle">Total</th>
+                    <td class="summary bg-primary-subtle">{{ long_total }}%</td>
+                    <td class="summary bg-primary-subtle">{{ short_total }}%</td>
+                    <td class="summary bg-primary-subtle">{{ longshort_total }}%</td>
+                    <td class="summary bg-primary-subtle">{{ longshort_annualized }}%</td>
                 </tr>
             </table>
 

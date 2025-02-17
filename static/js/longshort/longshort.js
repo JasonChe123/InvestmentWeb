@@ -163,10 +163,11 @@ $(document).ready(function () {
     // Format table: 'red' color for negative values, align all numbers to the right, turn numbers to scientific notation
     for (let i = 0; i < cells.length; i++) {
         const value = parseFloat(cells[i].textContent);
-
         if (typeof (value) === 'number' && !isNaN(value)) cells[i].style.textAlign = 'right';
         if (!isNaN(value) && value < 0) cells[i].classList.add("text-danger");
-        if (value > 1000 || value < -1000) cells[i].textContent = value.toExponential(2);
+        if (!cells[i].classList.contains("summary")) {
+            if (value > 1000 || value < -1000) cells[i].textContent = value.toExponential(2);
+        }
     }
 
     // Format table: add left border to ticker columns

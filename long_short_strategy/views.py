@@ -463,7 +463,7 @@ def get_result_from_method(
         # Min stock price filter
         res = CandleStick.objects.filter(
             stock__ticker__in=stock_list,
-            adj_close__gte=min_stock_price,
+            close__gte=min_stock_price,
             date__lt=date,
             date__gte=date - dt.timedelta(days=30),
         ).values_list("stock__id", flat=True)
@@ -576,12 +576,12 @@ def get_performance(
             date__gte=start_date,
             date__lte=end_date,
             open__gt=0,
-            adj_close__gt=0,
+            close__gt=0,
         ).order_by("-date")
 
         # Create candlesticks
         df_prices = pd.DataFrame(
-            list(query_res.values("stock__ticker", "date", "open", "adj_close"))
+            list(query_res.values("stock__ticker", "date", "open", "close"))
         )
 
         # Calculate performance
@@ -589,7 +589,7 @@ def get_performance(
             df_prices.groupby("stock__ticker")
             .apply(
                 lambda group: round(
-                    (group.iloc[0]["adj_close"] / group.iloc[-1]["open"] - 1) * 100, 2
+                    (group.iloc[0]["close"] / group.iloc[-1]["open"] - 1) * 100, 2
                 )
             )
             .reset_index(name=f"performance ({date})")
@@ -826,7 +826,7 @@ def convert_backtest_table_to_dataframe(tables: list, amount: int) -> pd.DataFra
     # Assign amount for each stock
     df["Amount(USD)"] = amount // 2 // len(df)
 
-    # Get previous adj_close for each stock
+    # Get previous close for each stock
     date_str = df.columns[1]
     date = dt.datetime.strptime(date_str, "%b %Y").replace(tzinfo=dt.timezone.utc)
     query_res = CandleStick.objects.filter(
@@ -835,13 +835,13 @@ def convert_backtest_table_to_dataframe(tables: list, amount: int) -> pd.DataFra
     df_prev_close = pd.DataFrame(
         query_res.values(
             "stock__ticker",
-            "adj_close",
+            "close",
         )
     ).drop_duplicates(subset="stock__ticker")
 
     # Rename columns
     df_prev_close.rename(
-        columns={"stock__ticker": "Ticker", "adj_close": "Prev Close"},
+        columns={"stock__ticker": "Ticker", "close": "Prev Close"},
         inplace=True,
     )
 

@@ -16,8 +16,8 @@ from manage_database.models import (
     GAAP_TO_READABLE_NAME_INCOME_STATEMENT,
 )
 import numpy as np
-import pandas as pd
 import os
+import pandas as pd
 import requests
 import time
 from tqdm import tqdm
@@ -57,6 +57,7 @@ class Command(BaseCommand):
 
         if options.get("update_candlesticks"):
             self._update_candlesticks()
+            # self._update_candlesticks_by_ibapi()
 
         if options.get("update_reports"):
             self._update_reports()
@@ -183,7 +184,7 @@ class Command(BaseCommand):
         ticker_list = list(stocks.keys())
         batch_size = 150
 
-        for i in range(0, len(ticker_list), batch_size):
+        for i in range(3450, len(ticker_list), batch_size):
             start_time = time.time()
 
             # Progress message
@@ -209,11 +210,11 @@ class Command(BaseCommand):
                         continue
 
                     date = row.name  # yf uses date as index name
-                    open_ = None if np.isnan(row["Open"]) else row["Open"]
-                    high = None if np.isnan(row["High"]) else row["High"]
-                    low = None if np.isnan(row["Low"]) else row["Low"]
-                    close = None if np.isnan(row["Close"]) else row["Close"]
-                    adj_close = None if np.isnan(row["Adj Close"]) else row["Adj Close"]
+                    date = date.replace(tzinfo=dt.timezone.utc)
+                    open_ = None if np.isnan(row["Open"]) else row["Open"].round(2)
+                    high = None if np.isnan(row["High"]) else row["High"].round(2)
+                    low = None if np.isnan(row["Low"]) else row["Low"].round(2)
+                    close = None if np.isnan(row["Close"]) else row["Close"].round(2)
                     volume = None if np.isnan(row["Volume"]) else row["Volume"]
 
                     candlestick = CandleStick(
@@ -223,7 +224,6 @@ class Command(BaseCommand):
                         high=high,
                         low=low,
                         close=close,
-                        adj_close=adj_close,
                         volume=volume,
                     )
 

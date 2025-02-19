@@ -118,11 +118,11 @@ class Stock(models.Model):
 class CandleStick(models.Model):
     stock = models.ForeignKey(Stock, on_delete=models.CASCADE)
     date = models.DateTimeField()
-    open = models.DecimalField(max_digits=10, decimal_places=2, null=True)
-    high = models.DecimalField(max_digits=10, decimal_places=2, null=True)
-    low = models.DecimalField(max_digits=10, decimal_places=2, null=True)
-    close = models.DecimalField(max_digits=10, decimal_places=2, null=True)
-    adj_close = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    open = models.DecimalField(max_digits=20, decimal_places=2, null=True)
+    high = models.DecimalField(max_digits=20, decimal_places=2, null=True)
+    low = models.DecimalField(max_digits=20, decimal_places=2, null=True)
+    close = models.DecimalField(max_digits=20, decimal_places=2, null=True)
+    # adj_close = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     volume = models.IntegerField(null=True)
 
 

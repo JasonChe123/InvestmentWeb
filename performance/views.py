@@ -415,7 +415,7 @@ def get_last_close(ticker: str) -> float:
         logging.warning(f"[ {ticker} ] Candlestick data is too far away.")
         return 0.0
 
-    value = candlesticks.last().adj_close
+    value = candlesticks.last().close
     return round(value, 2) if value else 0.0
 
 

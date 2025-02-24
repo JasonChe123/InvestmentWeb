@@ -184,7 +184,7 @@ class Command(BaseCommand):
         ticker_list = list(stocks.keys())
         batch_size = 150
 
-        for i in range(3450, len(ticker_list), batch_size):
+        for i in range(0, len(ticker_list), batch_size):
             start_time = time.time()
 
             # Progress message

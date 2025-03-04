@@ -1,8 +1,8 @@
 from dotenv import load_dotenv
 import logging
 
-# get finnhub api key
-load_dotenv()
+
+load_dotenv(override=True)
 
 # Configure logging
 logging.basicConfig(

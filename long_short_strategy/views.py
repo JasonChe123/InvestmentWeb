@@ -148,7 +148,7 @@ class BackTestView(View):
         market_cap = request.POST.getlist("market-cap")
         method = request.POST.get("selected-method").rstrip("+-*/")
         sectors = [s for s in self.sectors if request.POST.get(s)]
-        backtest_years = float(request.POST.get("backtest_years"))
+        backtest_years = int(request.POST.get("backtest_years"))
         pos_hold = int(request.POST.get("pos_hold"))
         min_stock_price = float(request.POST.get("min_stock_price"))
         sorting_method = request.POST.get("sorting_method")
@@ -397,17 +397,25 @@ def get_us_stocks(
     return results
 
 
-def get_re_balancing_dates(backtest_years: float = 1) -> list:
-    this_month = dt.datetime.now(tz=dt.timezone.utc).replace(
+def get_re_balancing_dates(backtest_years: int = 1) -> list:
+    """
+    Get a list of re-balancing dates for backtesting.
+    """
+    l_months = []
+    month = dt.datetime.now(tz=dt.timezone.utc).replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
-    date = (this_month - dt.timedelta(days=365 * backtest_years)).replace(day=1)
-    l_dates = []
-    while date <= this_month:
-        l_dates.append(date)
-        date = (date + dt.timedelta(days=31)).replace(day=1)
-
-    return l_dates
+    l_months.append(month)
+    for i in range(1, backtest_years * 12):
+        if month.month == 1:
+            month = month.replace(year=month.year - 1, month=12)
+        else:
+            month = month.replace(month=month.month - 1)
+        l_months.append(month)
+    
+    l_months.reverse()
+    
+    return l_months
 
 
 def get_result_from_method(
@@ -578,22 +586,30 @@ def get_performance(
             open__gt=0,
             close__gt=0,
         ).order_by("-date")
-
-        # Create candlesticks
-        df_prices = pd.DataFrame(
-            list(query_res.values("stock__ticker", "date", "open", "close"))
-        )
-
+        
         # Calculate performance
-        performance = (
-            df_prices.groupby("stock__ticker")
-            .apply(
-                lambda group: round(
-                    (group.iloc[0]["close"] / group.iloc[-1]["open"] - 1) * 100, 2
-                )
+        if query_res.count() == 0:
+            # Set performance to 0 if no data found
+            performance = df.copy()
+            performance[f"performance ({date})"] = 0
+            performance.drop(columns=date, inplace=True)
+            performance.reset_index(drop=True, inplace=True)
+        else:
+            # Create candlesticks
+            df_prices = pd.DataFrame(
+                list(query_res.values("stock__ticker", "date", "open", "close"))
             )
-            .reset_index(name=f"performance ({date})")
-        )
+
+            # Calculation
+            performance = (
+                df_prices.groupby("stock__ticker")
+                .apply(
+                    lambda group: round(
+                        (group.iloc[0]["close"] / group.iloc[-1]["open"] - 1) * 100, 2
+                    )
+                )
+                .reset_index(name=f"performance ({date})")
+            )
 
         # Merge result
         df = df.merge(performance, on="stock__ticker")
@@ -784,8 +800,8 @@ def export_csv(request):
     df_basket_trader["SecType"] = "STK"
     df_basket_trader["Exchange"] = "SMART/NASDAQ/NYSE/ARCA"
     df_basket_trader["Currency"] = "USD"
-    df_basket_trader["TimeInForce"] = "OPG"
-    df_basket_trader["OrderType"] = "MKT"
+    df_basket_trader["TimeInForce"] = "GTC"
+    df_basket_trader["OrderType"] = "LMT"
     df_basket_trader["BasketTag"] = basket_tag
     df_basket_trader["Account"] = ""
     df_basket_trader["OrderRef"] = basket_tag
@@ -826,8 +842,23 @@ def convert_backtest_table_to_dataframe(tables: list, amount: int) -> pd.DataFra
     # Assign amount for each stock
     df["Amount(USD)"] = amount // 2 // len(df)
 
+    # Get date string from df.columns
+    def search_date_string(string: str) -> bool:
+        pattern = r'^[A-Za-z]{3} \d{4}$'
+        match = re.match(pattern, string)
+        return bool(match)
+    
+    date_str = None
+    for col in df.columns:
+        if search_date_string(col):
+            date_str = col
+            break
+    
+    if not date_str:
+        logging.error("No date string found in the dataframe. Please check.")
+        return
+    
     # Get previous close for each stock
-    date_str = df.columns[1]
     date = dt.datetime.strptime(date_str, "%b %Y").replace(tzinfo=dt.timezone.utc)
     query_res = CandleStick.objects.filter(
         stock__ticker__in=df["Ticker"].tolist(), date__lt=date

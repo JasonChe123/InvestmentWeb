@@ -301,7 +301,7 @@ class BackTestView(View):
         short_annualized = (
             df_bottom.loc["Average"].apply(pd.to_numeric, errors="coerce").mean() * 12
         )
-        longshort_annualized = round((long_annualized - short_annualized) / 2, 2)
+        longshort_annualized = round((long_annualized - short_annualized), 2)
 
         # Total for all sectors
         self.long_total += long_total

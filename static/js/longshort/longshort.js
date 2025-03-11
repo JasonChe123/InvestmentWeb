@@ -18,7 +18,6 @@ $(document).ready(function () {
     const selectedMethod = $('#selected-method');
     const selectedMethodInput = $('#selected-method-input');
     const tables = $('table');
-    const heads = tables.find('th');
     const cells = tables.find('td');
 
     // CSRF token
@@ -170,16 +169,22 @@ $(document).ready(function () {
         }
     }
 
-    // Format table: add left border to ticker columns
-    for (let i = 0; i < heads.length; i++) {
-        if (heads[i].cellIndex % 3 === 0) {
-            heads[i].classList.add('border-start');
-
-            for (let j = 0; j < cells.length; j++) {
-                if (cells[j].cellIndex % 3 === 0) {
-                    cells[j].classList.add('border-start');
-                }
-            }
+    // Format table (.table-top.table-bottom): add left border to ticker columns (header rows)
+    const dataTables = $('.table-top,.table-bottom');
+    const dataTableheads = dataTables.find('th');
+    const dataTableCells = dataTables.find('td');
+    for (let i = 0; i < dataTableheads.length; i++) {
+        if (dataTableheads[i].cellIndex % 3 === 0) {
+            dataTableheads[i].classList.add('border-start');
+            dataTableheads[i].classList.add('border-primary');
+        }
+    }
+    
+    // Format table: add left border to ticker columns (data rows)
+    for (let j = 0; j < dataTableCells.length; j++) {
+        if (dataTableCells[j].cellIndex % 3 === 0) {
+            dataTableCells[j].classList.add('border-start');
+            dataTableCells[j].classList.add('border-primary');
         }
     }
 

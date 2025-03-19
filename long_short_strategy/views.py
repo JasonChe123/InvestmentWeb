@@ -11,12 +11,6 @@ from django.views import View
 from django.views.decorators.http import require_POST
 import json
 import logging
-import numpy as np
-import pandas as pd
-import re
-from tqdm import tqdm
-from typing import Tuple
-
 from manage_database.models import (
     Stock,
     IncomeStatement,
@@ -24,9 +18,11 @@ from manage_database.models import (
     CashFlow,
     CandleStick,
 )
-
-
+import numpy as np
+import pandas as pd
 import pdb
+import re
+from typing import Tuple
 
 
 market_cap = {
@@ -201,6 +197,27 @@ class BackTestView(View):
             self.html_context["data"], key=lambda d: d["sector"]
         )
 
+        # Add chart data
+        chart_data = self.add_chart_data()
+        chart_data.iloc[:, 1:] = chart_data.iloc[:, 1:].astype(float).round(2)
+        chart_data["date"] = chart_data["date"].apply(
+            lambda value: dt.datetime.strftime(value, "%d-%b-%Y")
+        )
+        self.html_context["chart_data"] = json.dumps(chart_data.to_dict(orient="list"))
+
+        # Get performance indicator (mdd, risk / return ratio)
+        for col in chart_data.columns:
+            # Only consider Total columns
+            if "_total" in col.lower():
+                mdd = get_mdd(chart_data[col])
+                rtr = get_risk_to_return_ratio(mdd, chart_data[col])
+
+                # Set html context
+                for i in self.html_context["data"]:
+                    if i["sector"] == col.replace("_Total", ""):
+                        i["mdd"] = mdd
+                        i["rtr"] = rtr
+
         # Update html context
         self.html_context["result"] = True
         self.html_context["long_total"] = round(self.long_total, 2)
@@ -211,7 +228,7 @@ class BackTestView(View):
         self.html_context["longshort_annualized"] = round(
             self.longshort_annualized / len(sectors), 2
         )
-        
+
         return render(request, "long_short/index.html", self.html_context)
 
     def start_backtest(
@@ -320,6 +337,153 @@ class BackTestView(View):
         }
         self.html_context["data"].append(data)
 
+    def add_chart_data(self):
+        def get_combine_performance(
+            df_data: pd.DataFrame,
+            df_candlesticks: pd.DataFrame,
+            matching_columns: list,
+            result_col_name: str,
+        ) -> pd.DataFrame | bool:
+            # Calculate performance
+            df_all = pd.DataFrame(columns=["date"])
+
+            for i in range(0, len(df_data.columns), 3):
+                # Validate columns
+                columns = df_data.columns[i : i + 3]
+                if (
+                    columns[0] != "Ticker"
+                    or columns[1] not in matching_columns
+                    or columns[2] != "Perf(%)"
+                ):
+                    logging.error(f"Invalid columns: {columns}. Please Check!")
+                    return False
+
+                # Initialize dataframe
+                df = df_data.iloc[:, i : i + 3][["Ticker"]]
+
+                # Get start date and end date
+                date = df_data.iloc[:, i : i + 3].columns[1]
+                start_date = dt.datetime.strptime(date, "%b %Y").replace(
+                    tzinfo=dt.timezone.utc
+                )
+                end_date = start_date.replace(
+                    day=monthrange(start_date.year, start_date.month)[-1]
+                )
+
+                # Filter candlesticks
+                df_candlesticks_filter = df_candlesticks[
+                    (df_candlesticks["date"] >= start_date)
+                    & (df_candlesticks["date"] <= end_date)
+                    & (df_candlesticks["stock__ticker"].isin(df["Ticker"].tolist()))
+                ]
+
+                # Get daily performance for each stock
+                grouped = df_candlesticks_filter.groupby("stock__ticker")
+                df_temp = pd.DataFrame(columns=["date"])
+                for ticker, data in grouped:
+                    # Init dataframe for ticker
+                    df_ticker = data.copy().reset_index(drop=True)
+
+                    # Calculate performance
+                    df_ticker[f"{ticker}_perf_percent"] = (
+                        df_ticker["close"] / df_ticker["open"][0] - 1
+                    ) * 100
+
+                    # Merge to df_temp
+                    df_temp = df_temp.merge(
+                        df_ticker[["date", f"{ticker}_perf_percent"]],
+                        on="date",
+                        how="outer",
+                    )
+
+                # Get average performance for all tickers
+                df_temp[result_col_name] = df_temp.iloc[:, 1:].mean(axis=1)
+
+                # Continue from the last month
+                if not df_all.empty:
+                    df_temp[result_col_name] += df_all[result_col_name].iloc[-1]
+
+                # Extract necessary columns
+                df_temp = df_temp[["date", result_col_name]]
+
+                # Combine to df_all
+                df_all = pd.concat(
+                    [df_all if not df_all.empty else None, df_temp], axis=0
+                )
+
+            return df_all.reset_index(drop=True)
+
+        # Init dataframe
+        df_total = pd.DataFrame(columns=["date"])
+
+        # Loop through each sector
+        for data in self.html_context["data"]:
+            # Get all tickers
+            tickers_top = set(data["df_top"]["Ticker"].values.flatten())
+            tickers_bottom = set(data["df_bottom"]["Ticker"].values.flatten())
+            tickers = tickers_top.union(tickers_bottom)
+
+            # Get all dates
+            date_pattern = r"^[A-Za-z]{3} \d{4}$"
+            matching_columns = [
+                col for col in data["df_top"].columns if re.match(date_pattern, col)
+            ]
+            start_date = dt.datetime.strptime(matching_columns[0], "%b %Y").replace(
+                tzinfo=dt.timezone.utc
+            )
+            end_date = dt.datetime.strptime(matching_columns[-1], "%b %Y").replace(
+                tzinfo=dt.timezone.utc
+            )
+            end_date = end_date.replace(
+                day=monthrange(end_date.year, end_date.month)[-1]
+            )
+
+            # Get candlesticks
+            res = CandleStick.objects.filter(
+                stock__ticker__in=tickers,
+                date__gte=start_date,
+                date__lte=end_date,
+            ).values("date", "stock__ticker", "open", "close")
+            df_candlesticks = pd.DataFrame(res)
+
+            # Get combined performance
+            df_top = get_combine_performance(
+                data["df_top"],
+                df_candlesticks,
+                matching_columns,
+                f"{data['sector']}_Long",
+            )
+            df_bottom = get_combine_performance(
+                data["df_bottom"],
+                df_candlesticks,
+                matching_columns,
+                f"{data['sector']}_Short",
+            )
+            df_bottom[f"{data['sector']}_Short"] = -df_bottom[f"{data['sector']}_Short"]
+
+            # Merge to df_total
+            df_total = df_total.merge(df_top, on="date", how="outer")
+            df_total = df_total.merge(df_bottom, on="date", how="outer")
+            df_total[f"{data['sector']}_Total"] = (
+                df_top[f"{data['sector']}_Long"] + df_bottom[f"{data['sector']}_Short"]
+            )
+
+        # Add S&P500 to df_total
+        if self.html_context["data"]:
+            res = CandleStick.objects.filter(
+                stock__ticker="^GSPC",
+                date__gte=start_date,
+                date__lte=end_date,
+            ).values("date", "stock__ticker", "open", "close")
+            df_sp500 = pd.DataFrame(res)
+            df_sp500["S&P_500"] = (df_sp500["close"] / df_sp500["open"][0] - 1) * 100
+            df_sp500["S&P_500"] = df_sp500["S&P_500"].astype(float).round(2)
+            df_total = df_total.merge(
+                df_sp500[["date", "S&P_500"]], on="date", how="left"
+            )
+
+        return df_total
+
 
 def separate_words(string: str) -> str:
     """
@@ -412,9 +576,9 @@ def get_re_balancing_dates(backtest_years: int = 1) -> list:
         else:
             month = month.replace(month=month.month - 1)
         l_months.append(month)
-    
+
     l_months.reverse()
-    
+
     return l_months
 
 
@@ -586,7 +750,7 @@ def get_performance(
             open__gt=0,
             close__gt=0,
         ).order_by("-date")
-        
+
         # Calculate performance
         if query_res.count() == 0:
             # Set performance to 0 if no data found
@@ -639,6 +803,23 @@ def get_average_performance(df: pd.DataFrame):
     df.loc["Average"] = df[perf_cols].mean().astype(float).round(2)
 
     return df
+
+
+def get_mdd(series: pd.Series) -> float:
+    "Get maxmimum drawdown"
+    highest = 0
+    mdd = 0
+    for i in series:
+        highest = max(i, highest)
+        if highest != i:
+            mdd = max(highest - i, mdd)
+
+    return round(mdd, 2)
+
+
+def get_risk_to_return_ratio(mdd: float, series: pd.Series) -> float:
+    """Total return divide by max drawdown"""
+    return round(series.iloc[-1] / mdd, 2)
 
 
 # Functions fetched from front end --------------------------------------------
@@ -844,20 +1025,20 @@ def convert_backtest_table_to_dataframe(tables: list, amount: int) -> pd.DataFra
 
     # Get date string from df.columns
     def search_date_string(string: str) -> bool:
-        pattern = r'^[A-Za-z]{3} \d{4}$'
+        pattern = r"^[A-Za-z]{3} \d{4}$"
         match = re.match(pattern, string)
         return bool(match)
-    
+
     date_str = None
     for col in df.columns:
         if search_date_string(col):
             date_str = col
             break
-    
+
     if not date_str:
         logging.error("No date string found in the dataframe. Please check.")
         return
-    
+
     # Get previous close for each stock
     date = dt.datetime.strptime(date_str, "%b %Y").replace(tzinfo=dt.timezone.utc)
     query_res = CandleStick.objects.filter(

@@ -123,7 +123,10 @@ class CandleStick(models.Model):
     low = models.DecimalField(max_digits=20, decimal_places=2, null=True)
     close = models.DecimalField(max_digits=20, decimal_places=2, null=True)
     # adj_close = models.DecimalField(max_digits=10, decimal_places=2, null=True)
-    volume = models.IntegerField(null=True)
+    volume = models.BigIntegerField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("stock", "date")
 
 
 class IncomeStatement(models.Model):

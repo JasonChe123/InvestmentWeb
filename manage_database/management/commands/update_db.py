@@ -1,8 +1,9 @@
 import datetime as dt
 from django.core.management.base import BaseCommand
 from django.db.models import Q
-from InvestmentWeb.settings import BASE_DIR, STATICFILES_DIRS
+from InvestmentWeb.settings import STATICFILES_DIRS
 import json
+import logging
 from manage_database.models import (
     Stock,
     CandleStick,
@@ -180,7 +181,7 @@ class Command(BaseCommand):
         start_date = dt.date.today() - dt.timedelta(days=365 * 5)
 
         # Init stock list
-        stocks = {stock.ticker: stock for stock in Stock.objects.all()}
+        stocks = {stock.ticker: stock for stock in Stock.objects.all().exclude(ticker="SFB")}
         ticker_list = list(stocks.keys())
         batch_size = 150
 
@@ -206,9 +207,12 @@ class Command(BaseCommand):
                 data_for_ticker = data.xs(ticker, axis=1, level=1)
                 for index, row in data_for_ticker.iterrows():
                     stock = stocks.get(ticker)
+                    
+                    # Validate stock before create CandleStick
                     if not stock:
+                        logging.info(f"{ticker} not found from database, Please.")
                         continue
-
+                    
                     date = row.name  # yf uses date as index name
                     date = date.replace(tzinfo=dt.timezone.utc)
                     open_ = None if np.isnan(row["Open"]) else row["Open"].round(2)
@@ -216,7 +220,7 @@ class Command(BaseCommand):
                     low = None if np.isnan(row["Low"]) else row["Low"].round(2)
                     close = None if np.isnan(row["Close"]) else row["Close"].round(2)
                     volume = None if np.isnan(row["Volume"]) else row["Volume"]
-
+                    
                     candlestick = CandleStick(
                         stock=stock,
                         date=date,
@@ -233,9 +237,10 @@ class Command(BaseCommand):
             CandleStick.objects.bulk_create(l_candlesticks, ignore_conflicts=True)
 
             # Wait to avoid hitting the rate limit of yfinance
-            wait_time = 60 - (time.time() - start_time)
-            if wait_time > 0:
-                time.sleep(wait_time)
+            if len(ticker_list) - i <= batch_size:
+                wait_time = 60 - (time.time() - start_time)
+                if wait_time > 0:
+                    time.sleep(wait_time)
 
         # Finish message
         self.stdout.write(self.style.NOTICE("Finished updating candlesticks."))

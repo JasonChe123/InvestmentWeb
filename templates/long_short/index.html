@@ -32,14 +32,13 @@
                 Ranked by - {{ selected_method }}
             </h5>
             <ul>
-                <li>(Stocks are omitted if the stock price is under ${{ selected_min_stock_price|floatformat:"0" }} from
-                    the 30 days)
+                <li>(Stocks are omitted if the stock price is under ${{ selected_min_stock_price|floatformat:"0" }})
                 </li>
             </ul>
         </div>
 
         <!-- Summary table -->
-        <div class="w-50">
+        <div>
         <table class="table table-bordered table-hover custom-shadow">
             <!-- Header -->
             <thead>
@@ -47,15 +46,10 @@
                     <th></th>
                     <th class="text-center">Top Stocks Perf(%)</th>
                     <th class="text-center">Bottom Stocks Perf(%)</th>
-                    <th class="text-center">Total Perf(%)</th>
+                    <th class="text-center">Total Perf(%)<br>(Buy Top Stocks, ShortSell Bottom Stocks)</th>
                     <th class="text-center">Annualized Perf(%)</th>
-                </tr>
-                <tr>
-                    <th></th>
-                    <th></th>
-                    <th></th>
-                    <th class="text-center">(Buy Top Stocks, ShortSell Bottom Stocks)</th>
-                    <th></th>
+                    <th class="text-center">MaxDrawDown(%)</th>
+                    <th class="text-center">Risk to Return</th>
                 </tr>
             </thead>
 
@@ -69,6 +63,8 @@
                     <td class="summary">{{ d.short_total }}%</td>
                     <td class="summary">{{ d.longshort_total }}%</td>
                     <td class="summary">{{ d.longshort_annualized }}%</td>
+                    <td class="summary">{{ d.mdd }}%</td>
+                    <td class="summary">{{ d.rtr }}</td>
                 </tr>
                 {% endfor %}
                 
@@ -79,6 +75,8 @@
                     <td class="summary bg-primary-subtle">{{ short_total }}%</td>
                     <td class="summary bg-primary-subtle">{{ longshort_total }}%</td>
                     <td class="summary bg-primary-subtle">{{ longshort_annualized }}%</td>
+                    <td></td>
+                    <td></td>
                 </tr>
             </tbody>
         </table>
@@ -88,6 +86,11 @@
         <button class="btn btn-primary h-50" data-bs-toggle="modal" data-bs-target="#basket-trader-modal">
             Export csv File
         </button>
+    </div>
+
+    <!-- Chart -->
+    <div class="mb-5 p-3 border border-primary rounded-3">
+        <canvas id="performance-chart" class="h-75 w-100"></canvas>
     </div>
 
     <!-- Result by sector -->
@@ -220,5 +223,8 @@
 <!-- Script -->
 <script src="{% static 'js/longshort/longshort.js' %}" id="longshort-js" csrf_token="{{ csrf_token }}"
     result="{{ result }}"></script>
+{% if result %}
+<script src="{% static 'js/longshort/chart.js' %}" id="longshort-chart-js" chartData="{{ chart_data }}" selectedMethod="{{ selected_method }}"></script>
+{% endif %}
 
 {% endblock content %}

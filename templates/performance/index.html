@@ -59,18 +59,18 @@
 
 <!-- Average prices selection -->
 <div class="ms-5 mb-3 d-flex align-items-center">
-    <b>Select Price as Average Price</b>
     <form class="ms-3" method="GET" action="{% url 'performance' %}">
         <select name="default_open_prices" class="form-select" style="width: 150px;" onChange="form.submit()">
-            {% if default_prices == "open" %}
+            {% if default_prices == "Open Prices" %}
                 <option value="Open Prices" selected >Open Prices</option>
-                <option value="Real Prices">Real Prices</option>
+                <option value="Dealt Prices">Dealt Prices</option>
             {% else %}
                 <option value="Open Prices">Open Prices</option>
-                <option value="Real Prices" selected>Real Prices</option>
+                <option value="Dealt Prices" selected>Dealt Prices</option>
             {% endif %}
         </select>
     </form>
+    <b class="ms-2">as Average Price</b>
 </div>
 
 <!-- Portfolio Info -->

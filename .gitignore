@@ -10,12 +10,7 @@ stock_list.csv
 settings.py
 css/
 not_use/
-apexcharts.amd.js
-apexcharts.common.js
-apexcharts.esm.js
-apexcharts.js
-apexcharts.min.js
-apexcharts2.js
+Chart.js
 bootstrap.bundle.min.js
 bootstrap.bundle.min.js.map
 jquery-3.6.0.min.js

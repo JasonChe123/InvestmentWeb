@@ -41,22 +41,22 @@ def home(request):
     #                },
     # 'group_name': {'created_on': '', 'data': [{...}, {...}, ...]}
     # }
-    for port in portfolio:
+    for p in portfolio:
         # Create group
-        if port.group_name not in grouped_portfolio:
-            grouped_portfolio[port.group_name] = {
-                "created_on": port.created_at,
+        if p.group_name not in grouped_portfolio:
+            grouped_portfolio[p.group_name] = {
+                "created_on": p.created_at,
                 "data": [],
             }
 
         # Append datac
-        grouped_portfolio[port.group_name]["data"].append(
+        grouped_portfolio[p.group_name]["data"].append(
             {
-                "financial_instrument": port.financial_instrument,
-                "position": port.position,
-                "avg_price": port.avg_price,
-                "last_price": port.last_price,
-                "exit_price": port.exit_price,
+                "financial_instrument": p.financial_instrument,
+                "position": p.position,
+                "avg_price": p.avg_price,
+                "last_price": p.last_price,
+                "exit_price": p.exit_price,
             }
         )
 
@@ -69,9 +69,9 @@ def home(request):
         # Set default average prices
         if request.GET.get("default_open_prices") == "Open Prices":
             df_portfolio = set_default_average_prices(df_portfolio, data["created_on"])
-            context = {"default_prices": "open"}
+            context = {"default_prices": "Open Prices"}
         else:
-            context = {"default_prices": "real"}
+            context = {"default_prices": "Dealt Prices"}
 
         df_positive, df_negative, mean_positive, mean_negative = data_cleaning(
             df_portfolio
@@ -81,6 +81,8 @@ def home(request):
         init_cost_negative = int(df_negative["Cost"].sum())
         df_positive = df_positive.replace(np.nan, 0)
         df_negative = df_negative.replace(np.nan, 0)
+        df_positive["Exit Price"].replace(0, "", inplace=True)
+        df_negative["Exit Price"].replace(0, "", inplace=True)
         # total_performance = round((df_positive['Profit'].sum() + df_negative['Profit'].sum()) /
         #                           (init_cost_positive + init_cost_negative) * 100, 2)
         total_performance = round(
@@ -437,23 +439,23 @@ def get_last_close(ticker: str) -> float:
     today = dt.datetime.today().replace(tzinfo=dt.timezone.utc)
     stock = Stock.objects.filter(ticker=ticker.strip())
     if not stock:
-        return 0.0
+        logging.warning(f"[ {ticker} ] No stock data found.")
+        return None
 
     stock = stock.first()
     candlesticks = CandleStick.objects.filter(
-        stock=stock, date__gte=today - dt.timedelta(days=30), date__lte=today
+        stock=stock, 
+        date__gte=today - dt.timedelta(days=30), 
+        date__lte=today,
+        close__isnull=False
     )
     if not candlesticks:
-        return 0.0
-
-    # Candlestick data may too far away from re-balancing date
-    candlestick_end_date = candlesticks.last().date
-    if candlestick_end_date < today - dt.timedelta(days=10):
-        logging.warning(f"[ {ticker} ] Candlestick data is too far away.")
-        return 0.0
+        logging.warning(f"[ {ticker} ] No candlestick data found.")
+        return None
 
     value = candlesticks.last().close
-    return round(value, 2) if value else 0.0
+    
+    return round(value, 2) if value else None
 
 
 def get_mean_performance(portfolio: pd.DataFrame) -> float:

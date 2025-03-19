@@ -203,6 +203,7 @@ class BackTestView(View):
         chart_data["date"] = chart_data["date"].apply(
             lambda value: dt.datetime.strftime(value, "%d-%b-%Y")
         )
+        chart_data.ffill(inplace=True)
         self.html_context["chart_data"] = json.dumps(chart_data.to_dict(orient="list"))
 
         # Get performance indicator (mdd, risk / return ratio)
@@ -815,6 +816,7 @@ def get_average_performance(df: pd.DataFrame):
 
 def get_mdd(series: pd.Series) -> float:
     "Get maxmimum drawdown"
+    series.dropna(inplace=True)
     highest = 0
     mdd = 0
     for i in series:
@@ -827,6 +829,7 @@ def get_mdd(series: pd.Series) -> float:
 
 def get_risk_to_return_ratio(mdd: float, series: pd.Series) -> float:
     """Total return divide by max drawdown"""
+    series.dropna(inplace=True)
     return round(series.iloc[-1] / mdd, 2)
 
 

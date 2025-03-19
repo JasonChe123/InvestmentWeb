@@ -53,10 +53,18 @@ function main() {
             },
             scales: {
                 yAxes: [{
-                    gridLines: { color: "rgba(130, 130, 130, 0.2)" }
+                    gridLines: { color: "rgba(130, 130, 130, 0.2)" },
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 10,
+                    },
                 }],
                 xAxes: [{
-                    gridLines: { color: "rgba(130, 130, 130, 0.2)" }
+                    gridLines: { color: "rgba(130, 130, 130, 0.2)" },
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 10,
+                    },
                 }],
             },
             title: {
@@ -74,7 +82,7 @@ function main() {
         chart.options.scales.xAxes[0].ticks.fontColor = isDark ? '#ffffff' : '#000000';
         chart.data.datasets.forEach((dataset, index) => {
             let ref = index + 1;
-            
+
             if (dataset.label.includes('Long')) {
                 // Set color for long position
                 dataset.borderColor = isDark ? darkThemeLongColor : lightThemeLongColor;
@@ -82,11 +90,11 @@ function main() {
             } else if (dataset.label.includes('Short')) {
                 // Set color for short position
                 dataset.borderColor = isDark ? darkThemeShortColor : lightThemeShortColor;
-            
+
             } else if (dataset.label.includes('S&P 500')) {
                 // Set color for short position
                 dataset.borderColor = isDark ? darkThemeSP500Color : lightThemeSP500Color;
-            
+
             } else {
                 // Set color for total position
                 if (totalCount > 1) {

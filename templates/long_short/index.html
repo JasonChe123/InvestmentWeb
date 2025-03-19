@@ -67,6 +67,17 @@
                     <td class="summary">{{ d.rtr }}</td>
                 </tr>
                 {% endfor %}
+
+                <!-- For S&P 500 -->
+                 <tr>
+                    <th>S&P 500</th>
+                    <td></td>
+                    <td></td>
+                    <td>{{ sp500_total }}%</td>
+                    <td>{{ sp500_annualized }}%</td>
+                    <td>{{ sp500_mdd }}%</td>
+                    <td>{{ sp500_rtr}}</td>
+                 </tr>
                 
                 <!-- Total -->
                 <tr class="bg-primary-subtle">
@@ -75,8 +86,8 @@
                     <td class="summary bg-primary-subtle">{{ short_total }}%</td>
                     <td class="summary bg-primary-subtle">{{ longshort_total }}%</td>
                     <td class="summary bg-primary-subtle">{{ longshort_annualized }}%</td>
-                    <td></td>
-                    <td></td>
+                    <td class="summary bg-primary-subtle"></td>
+                    <td class="summary bg-primary-subtle"></td>
                 </tr>
             </tbody>
         </table>

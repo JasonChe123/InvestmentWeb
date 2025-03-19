@@ -61,17 +61,20 @@ def home(request):
         )
 
     # Prepare context
+    context = {}
     processed_portfolio = []
 
     for group_name, data in grouped_portfolio.items():
         df_portfolio = pd.DataFrame(data["data"])
 
-        # Set default average prices
-        if request.GET.get("default_open_prices") == "Open Prices":
-            df_portfolio = set_default_average_prices(df_portfolio, data["created_on"])
-            context = {"default_prices": "Open Prices"}
-        else:
-            context = {"default_prices": "Dealt Prices"}
+        # # Set average prices
+        df_portfolio = set_default_average_prices(df_portfolio, data["created_on"])
+        # todo: to be deleted
+        # if request.GET.get("default_open_prices") == "Open Prices":
+        #     df_portfolio = set_default_average_prices(df_portfolio, data["created_on"])
+        #     context = {"default_prices": "Open Prices"}
+        # else:
+        #     context = {"default_prices": "Dealt Prices"}
 
         df_positive, df_negative, mean_positive, mean_negative = data_cleaning(
             df_portfolio

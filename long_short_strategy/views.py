@@ -229,6 +229,14 @@ class BackTestView(View):
             self.longshort_annualized / len(sectors), 2
         )
 
+        # Add S&P500 data
+        total = chart_data["S&P_500"].iloc[-1]
+        mdd = get_mdd(chart_data["S&P_500"])
+        self.html_context["sp500_total"] = total
+        self.html_context["sp500_annualized"] = round(total / backtest_years, 2)
+        self.html_context["sp500_mdd"] = mdd
+        self.html_context["sp500_rtr"] = get_risk_to_return_ratio(mdd, chart_data["S&P_500"])
+
         return render(request, "long_short/index.html", self.html_context)
 
     def start_backtest(

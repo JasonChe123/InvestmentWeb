@@ -3,7 +3,7 @@ from concurrent.futures.thread import ThreadPoolExecutor
 import csv
 import datetime as dt
 from django.contrib import messages
-from django.db.models import Max, Q
+from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.template.context_processors import csrf
@@ -204,7 +204,9 @@ class BackTestView(View):
             lambda value: dt.datetime.strftime(value, "%d-%b-%Y")
         )
         chart_data.ffill(inplace=True)
-        self.html_context["chart_data"] = json.dumps(chart_data.to_dict(orient="list"))
+        chart_data_clean = chart_data.copy()
+        chart_data_clean.fillna(0, inplace=True)
+        self.html_context["chart_data"] = json.dumps(chart_data_clean.to_dict(orient="list"))
 
         # Get performance indicator (mdd, risk / return ratio)
         for col in chart_data.columns:
@@ -231,12 +233,13 @@ class BackTestView(View):
         )
 
         # Add S&P500 data
-        total = chart_data["S&P_500"].iloc[-1]
-        mdd = get_mdd(chart_data["S&P_500"])
-        self.html_context["sp500_total"] = total
-        self.html_context["sp500_annualized"] = round(total / backtest_years, 2)
-        self.html_context["sp500_mdd"] = mdd
-        self.html_context["sp500_rtr"] = get_risk_to_return_ratio(mdd, chart_data["S&P_500"])
+        if not chart_data.empty:
+            total = chart_data["S&P_500"].iloc[-1]
+            mdd = get_mdd(chart_data["S&P_500"])
+            self.html_context["sp500_total"] = total
+            self.html_context["sp500_annualized"] = round(total / backtest_years, 2)
+            self.html_context["sp500_mdd"] = mdd
+            self.html_context["sp500_rtr"] = get_risk_to_return_ratio(mdd, chart_data["S&P_500"])
 
         return render(request, "long_short/index.html", self.html_context)
 
@@ -1075,3 +1078,6 @@ def convert_backtest_table_to_dataframe(tables: list, amount: int) -> pd.DataFra
     df["Expected Position"] = df["Amount(USD)"] / df["Prev Close"]
 
     return df
+
+
+# todo: peer review

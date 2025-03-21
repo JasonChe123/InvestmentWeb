@@ -1,5 +1,6 @@
 import datetime as dt
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.db.models import Q
 from InvestmentWeb.settings import STATICFILES_DIRS
 import json
@@ -197,44 +198,45 @@ class Command(BaseCommand):
             batch = ticker_list[i : i + batch_size]
             data = yf.download(tickers=batch, start=start_date, progress=False)
 
-            # Delete from database
-            yf_tickers = data.columns.get_level_values(1).unique().tolist()
-            CandleStick.objects.filter(Q(stock__ticker__in=yf_tickers)).delete()
+            with transaction.atomic():
+                # Delete from database
+                yf_tickers = data.columns.get_level_values(1).unique().tolist()
+                CandleStick.objects.filter(Q(stock__ticker__in=yf_tickers)).delete()
 
-            # Update candlesticks
-            l_candlesticks = []
-            for ticker in yf_tickers:
-                data_for_ticker = data.xs(ticker, axis=1, level=1)
-                for index, row in data_for_ticker.iterrows():
-                    stock = stocks.get(ticker)
-                    
-                    # Validate stock before create CandleStick
-                    if not stock:
-                        logging.info(f"{ticker} not found from database, Please.")
-                        continue
-                    
-                    date = row.name  # yf uses date as index name
-                    date = date.replace(tzinfo=dt.timezone.utc)
-                    open_ = None if np.isnan(row["Open"]) else row["Open"].round(2)
-                    high = None if np.isnan(row["High"]) else row["High"].round(2)
-                    low = None if np.isnan(row["Low"]) else row["Low"].round(2)
-                    close = None if np.isnan(row["Close"]) else row["Close"].round(2)
-                    volume = None if np.isnan(row["Volume"]) else row["Volume"]
-                    
-                    candlestick = CandleStick(
-                        stock=stock,
-                        date=date,
-                        open=open_,
-                        high=high,
-                        low=low,
-                        close=close,
-                        volume=volume,
-                    )
+                # Update candlesticks
+                l_candlesticks = []
+                for ticker in yf_tickers:
+                    data_for_ticker = data.xs(ticker, axis=1, level=1)
+                    for index, row in data_for_ticker.iterrows():
+                        stock = stocks.get(ticker)
+                        
+                        # Validate stock before create CandleStick
+                        if not stock:
+                            logging.info(f"{ticker} not found from database, Please.")
+                            continue
+                        
+                        date = row.name  # yf uses date as index name
+                        date = date.replace(tzinfo=dt.timezone.utc)
+                        open_ = None if np.isnan(row["Open"]) else row["Open"].round(2)
+                        high = None if np.isnan(row["High"]) else row["High"].round(2)
+                        low = None if np.isnan(row["Low"]) else row["Low"].round(2)
+                        close = None if np.isnan(row["Close"]) else row["Close"].round(2)
+                        volume = None if np.isnan(row["Volume"]) else row["Volume"]
+                        
+                        candlestick = CandleStick(
+                            stock=stock,
+                            date=date,
+                            open=open_,
+                            high=high,
+                            low=low,
+                            close=close,
+                            volume=volume,
+                        )
 
-                    l_candlesticks.append(candlestick)
+                        l_candlesticks.append(candlestick)
 
-            # Bulk create
-            CandleStick.objects.bulk_create(l_candlesticks, ignore_conflicts=True)
+                # Bulk create
+                CandleStick.objects.bulk_create(l_candlesticks, ignore_conflicts=True)
 
             # Wait to avoid hitting the rate limit of yfinance
             if len(ticker_list) - i <= batch_size:

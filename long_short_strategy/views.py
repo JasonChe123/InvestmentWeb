@@ -2,6 +2,7 @@ from calendar import monthrange
 from concurrent.futures.thread import ThreadPoolExecutor
 import csv
 import datetime as dt
+from dateutil.relativedelta import relativedelta
 from django.contrib import messages
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
@@ -52,14 +53,16 @@ sectors = [
 class BackTestView(View):
     def __init__(self):
         super().__init__()
+        self.market_cap = market_cap
+        self.backtest_years = [i for i in range(1, 6)]
+        self.pos_hold = [50, 40, 30, 20, 10]
+        self.min_stock_price = [1, 2, 3, 4, 5, 10]
+        self.sectors = {sector: 0 for sector in sectors}
         self.long_total = 0
         self.short_total = 0
         self.longshort_annualized = 0
 
-        # Initialize parameter: market cap
-        self.market_cap = market_cap
-
-        # # Initialize parameter: fundamental data
+        # Get a list of income statement data
         self.income_statement = sorted(
             [
                 separate_words(field.name)
@@ -76,6 +79,8 @@ class BackTestView(View):
                 )
             ]
         )
+
+        # Get a list of balance sheet data
         self.balance_sheet_data = sorted(
             [
                 separate_words(field.name)
@@ -92,6 +97,8 @@ class BackTestView(View):
                 )
             ]
         )
+
+        # Get a list of cash flow data
         self.cash_flow_data = sorted(
             [
                 separate_words(field.name)
@@ -108,12 +115,6 @@ class BackTestView(View):
                 )
             ]
         )
-
-        # # Initialize other parameters
-        self.backtest_years = [i for i in range(1, 5)]
-        self.pos_hold = [50, 40, 30, 20, 10]
-        self.min_stock_price = [1, 2, 3, 4, 5, 10]
-        self.sectors = {k: 0 for k in sectors}
 
         # Setup html context
         self.html_context = {
@@ -140,7 +141,7 @@ class BackTestView(View):
         return render(request, "long_short/index.html", self.html_context)
 
     def post(self, request):
-        # Get user's parameters
+        # Get user's inputs
         market_cap = request.POST.getlist("market-cap")
         method = request.POST.get("selected-method").rstrip("+-*/")
         sectors = [s for s in self.sectors if request.POST.get(s)]
@@ -194,7 +195,7 @@ class BackTestView(View):
 
         # Sort result by sector
         self.html_context["data"] = sorted(
-            self.html_context["data"], key=lambda d: d["sector"]
+            self.html_context["data"], key=lambda data: data["sector"]
         )
 
         # Add chart data
@@ -203,19 +204,23 @@ class BackTestView(View):
         chart_data["date"] = chart_data["date"].apply(
             lambda value: dt.datetime.strftime(value, "%d-%b-%Y")
         )
+        chart_data = chart_data.infer_objects(copy=False)
         chart_data.ffill(inplace=True)
         chart_data_clean = chart_data.copy()
+        chart_data_clean = chart_data_clean.infer_objects(copy=False)
         chart_data_clean.fillna(0, inplace=True)
-        self.html_context["chart_data"] = json.dumps(chart_data_clean.to_dict(orient="list"))
+        self.html_context["chart_data"] = json.dumps(
+            chart_data_clean.to_dict(orient="list")
+        )
 
-        # Get performance indicator (mdd, risk / return ratio)
+        # Get performance indicator (mdd, risk/return ratio)
         for col in chart_data.columns:
             # Only consider Total columns
             if "_total" in col.lower():
                 mdd = get_mdd(chart_data[col])
                 rtr = get_risk_to_return_ratio(mdd, chart_data[col])
 
-                # Set html context
+                # Add indicators to html context
                 for i in self.html_context["data"]:
                     if i["sector"] == col.replace("_Total", ""):
                         i["mdd"] = mdd
@@ -239,7 +244,9 @@ class BackTestView(View):
             self.html_context["sp500_total"] = total
             self.html_context["sp500_annualized"] = round(total / backtest_years, 2)
             self.html_context["sp500_mdd"] = mdd
-            self.html_context["sp500_rtr"] = get_risk_to_return_ratio(mdd, chart_data["S&P_500"])
+            self.html_context["sp500_rtr"] = get_risk_to_return_ratio(
+                mdd, chart_data["S&P_500"]
+            )
 
         return render(request, "long_short/index.html", self.html_context)
 
@@ -254,8 +261,16 @@ class BackTestView(View):
         min_stock_price,
         sorting_method,
     ):
+        """
+        Backtest strategy and add the result to self.html_context.
+        """
         # Get US stocks
-        df_us_stocks = get_us_stocks(market_cap, sector)
+        try:
+            df_us_stocks = get_us_stocks(market_cap, sector)
+        except Exception as e:
+            messages.warning(request, f"Error fetching US stocks for {sector}. ({e})")
+            return
+
         if len(df_us_stocks) == 0 and not messages.get_messages(request):
             messages.warning(request, "No stocks found, please adjust your filter.")
             return
@@ -263,21 +278,18 @@ class BackTestView(View):
         # Get re-balancing dates
         l_re_balancing_dates = get_re_balancing_dates(backtest_years)
 
-        # Get result by method chose
+        # Get result by method for all stocks
         results = get_result_from_method(
             method,
             df_us_stocks["Ticker"].tolist(),
             min_stock_price,
             l_re_balancing_dates,
-            self.income_statement,
-            self.balance_sheet_data,
-            self.cash_flow_data,
         )
 
-        # Ranking and split results
+        # Sort stocks by method, get top and bottom stocks by pos_hold, and split results by re-balancing dates
         result_subset = ranking(results, sorting_method, min_stock_price)
 
-        # Get performance for each re-balancing date
+        # Get performance for all stocks
         df_top, df_bottom = get_performance(result_subset, pos_hold)
         if df_top.empty or df_bottom.empty:
             messages.warning(
@@ -286,7 +298,7 @@ class BackTestView(View):
             )
             return
 
-        # Add average performance to the top stocks, and bottom stocks
+        # Add row "Average" to dataframe
         get_average_performance(df_top)
         get_average_performance(df_bottom)
 
@@ -332,7 +344,7 @@ class BackTestView(View):
         )
         longshort_annualized = round((long_annualized - short_annualized), 2)
 
-        # Total for all sectors
+        # Add annualized performance to "Total"
         self.long_total += long_total
         self.short_total += short_total
         self.longshort_annualized += longshort_annualized
@@ -349,7 +361,9 @@ class BackTestView(View):
         }
         self.html_context["data"].append(data)
 
-    def add_chart_data(self):
+    def add_chart_data(self) -> pd.DataFrame:
+        """Return a dataframe of chart_data for frontend chart."""
+
         def get_combine_performance(
             df_data: pd.DataFrame,
             df_candlesticks: pd.DataFrame,
@@ -367,7 +381,7 @@ class BackTestView(View):
                     or columns[1] not in matching_columns
                     or columns[2] != "Perf(%)"
                 ):
-                    logging.error(f"Invalid columns: {columns}. Please Check!")
+                    logging.error(f"Invalid columns: {columns} from {df_data.columns}. Please Check!")
                     return False
 
                 # Initialize dataframe
@@ -418,24 +432,25 @@ class BackTestView(View):
                 # Extract necessary columns
                 df_temp = df_temp[["date", result_col_name]]
 
-                # Combine to df_all
-                df_all = pd.concat(
-                    [df_all if not df_all.empty else None, df_temp], axis=0
-                )
+                # df_temp joins df_all
+                if df_temp.empty and df_all.empty:
+                    continue
+                elif df_all.empty and not df_temp.empty:
+                    df_all = df_temp.copy()
+                else:
+                    df_all = pd.concat([df_all, df_temp], axis=0)
 
             return df_all.reset_index(drop=True)
 
-        # Init dataframe
-        df_total = pd.DataFrame(columns=["date"])
-
         # Loop through each sector
+        df_total = pd.DataFrame(columns=["date"])
         for data in self.html_context["data"]:
             # Get all tickers
-            tickers_top = set(data["df_top"]["Ticker"].values.flatten())
-            tickers_bottom = set(data["df_bottom"]["Ticker"].values.flatten())
-            tickers = tickers_top.union(tickers_bottom)
+            tickers_long = set(data["df_top"]["Ticker"].values.flatten())
+            tickers_short = set(data["df_bottom"]["Ticker"].values.flatten())
+            tickers = tickers_long.union(tickers_short)
 
-            # Get all dates
+            # Get start_date and end_date
             date_pattern = r"^[A-Za-z]{3} \d{4}$"
             matching_columns = [
                 col for col in data["df_top"].columns if re.match(date_pattern, col)
@@ -450,7 +465,7 @@ class BackTestView(View):
                 day=monthrange(end_date.year, end_date.month)[-1]
             )
 
-            # Get candlesticks
+            # Get candlesticks (date, stock__ticker, open, close) for all tickers, from start_date to end_date
             res = CandleStick.objects.filter(
                 stock__ticker__in=tickers,
                 date__gte=start_date,
@@ -458,29 +473,29 @@ class BackTestView(View):
             ).values("date", "stock__ticker", "open", "close")
             df_candlesticks = pd.DataFrame(res)
 
-            # Get combined performance
-            df_top = get_combine_performance(
+            # Add performance from start_date to end_date
+            df_long = get_combine_performance(
                 data["df_top"],
                 df_candlesticks,
                 matching_columns,
                 f"{data['sector']}_Long",
             )
-            df_bottom = get_combine_performance(
+            df_short = get_combine_performance(
                 data["df_bottom"],
                 df_candlesticks,
                 matching_columns,
                 f"{data['sector']}_Short",
             )
-            df_bottom[f"{data['sector']}_Short"] = -df_bottom[f"{data['sector']}_Short"]
+            df_short[f"{data['sector']}_Short"] = -df_short[f"{data['sector']}_Short"]
 
-            # Merge to df_total
-            df_total = df_total.merge(df_top, on="date", how="outer")
-            df_total = df_total.merge(df_bottom, on="date", how="outer")
+            # Merge df_long and df_short to df_total
+            df_total = df_total.merge(df_long, on="date", how="outer")
+            df_total = df_total.merge(df_short, on="date", how="outer")
             df_total[f"{data['sector']}_Total"] = (
-                df_top[f"{data['sector']}_Long"] + df_bottom[f"{data['sector']}_Short"]
+                df_long[f"{data['sector']}_Long"] + df_short[f"{data['sector']}_Short"]
             )
 
-        # Add S&P500 to df_total
+        # Add performance of S&P_500 (ticker: ^GSPC) to df_total
         if self.html_context["data"]:
             res = CandleStick.objects.filter(
                 stock__ticker="^GSPC",
@@ -509,7 +524,7 @@ def get_us_stocks(
     sector_filter: str | list = None,
 ) -> pd.DataFrame:
     """
-    Return us stocks based on selected market cap, min ipo years, and sectors.
+    Return us stocks information by selected market cap and sectors.
     """
     market_cap_str = list(market_cap.keys())
     market_cap_value = list(market_cap.values())
@@ -522,7 +537,7 @@ def get_us_stocks(
     micro = market_cap_str[4] in market_cap_filter
     nano = market_cap_str[5] in market_cap_filter
 
-    # Setup query
+    # MarketCap query
     mega_q = Q(market_cap__gte=market_cap_value[0]) if mega else Q()
     large_q = (
         Q(market_cap__range=[market_cap_value[1][0], market_cap_value[1][-1]])
@@ -549,6 +564,8 @@ def get_us_stocks(
         if nano
         else Q()
     )
+
+    # Sector query
     if sector_filter:
         if isinstance(sector_filter, str):
             sector_q = Q(sector=sector_filter)
@@ -559,14 +576,12 @@ def get_us_stocks(
     else:
         sector_q = Q()
 
-    # Query database
+    # Get stock information by marketcap and sectors
     results = Stock.objects.filter(
         (mega_q | large_q | medium_q | small_q | micro_q | nano_q),
         sector_q,
-        ticker__regex=r"^[a-zA-Z]{1,4}$",
+        ticker__regex=r"^[a-zA-Z]{1,5}$",
     )
-
-    # Convert to dataframe
     results = pd.DataFrame(results.values())
     results.rename(columns={"ticker": "Ticker"}, inplace=True)
 
@@ -575,21 +590,17 @@ def get_us_stocks(
 
 def get_re_balancing_dates(backtest_years: int = 1) -> list:
     """
-    Get a list of re-balancing dates for backtesting.
+    Retrun a list of re-balancing dates for backtesting.
+    (re-balancing dates are the first day of every months)
     """
     l_months = []
-    month = dt.datetime.now(tz=dt.timezone.utc).replace(
+    this_month = dt.datetime.now(tz=dt.timezone.utc).replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
-    l_months.append(month)
-    for i in range(1, backtest_years * 12):
-        if month.month == 1:
-            month = month.replace(year=month.year - 1, month=12)
-        else:
-            month = month.replace(month=month.month - 1)
-        l_months.append(month)
-
-    l_months.reverse()
+    [
+        l_months.append(this_month - relativedelta(months=m))
+        for m in reversed(range(backtest_years * 12))
+    ]
 
     return l_months
 
@@ -599,12 +610,9 @@ def get_result_from_method(
     stock_list: list,
     min_stock_price: float,
     re_balancing_dates: list,
-    income_statement_data: list,  # ['Basic EPS', 'EPS', ...]
-    balance_sheet_data: list,
-    cash_flow_data: list,
 ) -> pd.DataFrame:
     """
-    Calculate the result of a given formula for US stocks based on financial data and re-balancing dates.
+    Add results from the given formula and return as a DataFrame.
 
     ticker  date1   date2   date3
     AAPL    0.52    0.51    0.1
@@ -613,117 +621,135 @@ def get_result_from_method(
     pd.DataFrame()
 
     """
-    # Extract data names from method
+    # Extract data names from 'formula'
     datas = re.findall(r"\w+(?:\s+\w+)*", formula)
-    datas = [data.replace(" ", "").strip() for data in datas]
 
-    # Format data names - E.g. from 'Basic EPS' to 'BasicEPS'
-    income_statement_data = [
-        data.replace(" ", "").strip() for data in income_statement_data
-    ]
-    balance_sheet_data = [data.replace(" ", "").strip() for data in balance_sheet_data]
-    cash_flow_data = [data.replace(" ", "").strip() for data in cash_flow_data]
+    # Trun data nammes to GAAP format (data names in database)
+    datas = [data.replace(" ", "").strip() for data in datas]
     formula = formula.replace(" ", "").strip()
 
     # Validate report data
-    income_statement_data = set(datas).intersection(
-        set([field.name for field in IncomeStatement._meta.get_fields()])
+    l_income_statement = list(
+        set(datas).intersection(
+            set([field.name for field in IncomeStatement._meta.get_fields()])
+        )
     )
-    balance_sheet_data = set(datas).intersection(
-        set([field.name for field in BalanceSheet._meta.get_fields()])
+    l_balance_sheet = list(
+        set(datas).intersection(
+            set([field.name for field in BalanceSheet._meta.get_fields()])
+        )
     )
-    cash_flow_data = set(datas).intersection(
-        set([field.name for field in CashFlow._meta.get_fields()])
+    l_cash_flow = list(
+        set(datas).intersection(
+            set([field.name for field in CashFlow._meta.get_fields()])
+        )
     )
 
-    # Calculate result for each re-balancing date
-    result_df = pd.DataFrame(
-        columns=[
-            "stock__ticker",
-        ],
-        data=stock_list,
-    )
+    # Get data from database and apply formula for each re-balancing date
+    df_result = pd.DataFrame(columns=["stock__ticker"], data=stock_list)
+
     for date in re_balancing_dates:
-        # Min stock price filter
+        # Get stock ids by min_stock_price and dates
         res = CandleStick.objects.filter(
             stock__ticker__in=stock_list,
             close__gte=min_stock_price,
             date__lt=date,
             date__gte=date - dt.timedelta(days=30),
         ).values_list("stock__id", flat=True)
-        valid_stock_ids = list(set(res))
+        stock_ids = list(set(res))
 
-        # Read data with dataframe
-        report_df = pd.DataFrame(columns=["stock__ticker"])
-        if income_statement_data:
-            report_df = merge_report(
+        # Get data from database
+        df_report = pd.DataFrame(columns=["stock__ticker"])
+        if l_income_statement:
+            df_report = merge_report(
                 IncomeStatement,
-                report_df,
-                valid_stock_ids,
+                df_report,
+                stock_ids,
                 date,
-                list(income_statement_data),
+                l_income_statement,
             )
-
-        if balance_sheet_data:
-            report_df = merge_report(
-                BalanceSheet, report_df, valid_stock_ids, date, list(balance_sheet_data)
+        if l_balance_sheet:
+            df_report = merge_report(
+                BalanceSheet, df_report, stock_ids, date, l_balance_sheet
             )
+        if l_cash_flow:
+            df_report = merge_report(CashFlow, df_report, stock_ids, date, l_cash_flow)
 
-        if cash_flow_data:
-            report_df = merge_report(
-                CashFlow, report_df, valid_stock_ids, date, list(cash_flow_data)
-            )
-
-        # Calculate by formula
+        # Apply formula
         column_name = dt.datetime.strftime(date, "%Y-%m-%d")
-        report_df = report_df.replace(np.nan, 0)
-        values = apply_formula(report_df, formula, column_name)
-        result_df = result_df.merge(
+        df_report.fillna(0, inplace=True)
+        values = apply_formula(df_report, formula, column_name)
+        df_result = df_result.merge(
             values[["stock__ticker", column_name]], how="left", on="stock__ticker"
         )
 
-    return result_df.replace(np.nan, 0).replace(np.inf, 0).replace(-np.inf, 0)
+    return df_result.replace(np.nan, 0).replace(np.inf, 0).replace(-np.inf, 0)
 
 
 def merge_report(
     model: Tuple[IncomeStatement | BalanceSheet | CashFlow],
     report: pd.DataFrame,
-    valid_stock_ids: list,
+    stock_ids: list,
     date: dt.datetime,
-    report_data: list,
+    data_name: list,
 ) -> pd.DataFrame:
+    """Get data from database and merge into report."""
+    # Drop duplicate columnsn
+    if set(data_name).intersection(set(report.columns)):
+        report.drop(columns=data_name, inplace=True)
+
+    # Query database by stock ids and date
     query_res = model.objects.filter(
-        stock__id__in=valid_stock_ids,
+        stock__id__in=stock_ids,
         FileDate__lt=date,
         FileDate__gt=date - dt.timedelta(days=365),
-        **{f"{data}__isnull": False for data in report_data},
+        **{f"{data}__isnull": False for data in data_name},
     ).order_by("-FileDate")
+
+    # Get most updated data
     df = pd.DataFrame(
         query_res.values(
             "stock__ticker",
             "FileDate",
-            *[data for data in report_data],
+            *[data for data in data_name],
         )
     ).drop_duplicates(subset="stock__ticker")
+
+    # Merge df to report
     result = report.merge(
-        df[["stock__ticker"] + report_data], on=["stock__ticker"], how="outer"
+        df[["stock__ticker"] + data_name], on=["stock__ticker"], how="outer"
     )
 
     return result
 
 
 def apply_formula(df: pd.DataFrame, formula: str, result_col_name: str) -> pd.DataFrame:
-    # Replace columns names
+    # Replace formula to "df[data_name] +-*/ df[data_name]..."
     for col in df.columns:
         formula = formula.replace(col, f'df["{col}"]')
+        if col != "stock__ticker":
+            df[col] = df[col].astype(float)
 
     # Evaluate
-    df[result_col_name] = eval(formula).round(2)
+    df[result_col_name] = eval(formula)
+
+    # Format the result column values
+    df[result_col_name] = df[result_col_name].apply(
+        lambda x: f"{x:.2e}" if (x != 0 and (abs(x) >= 1e6 or abs(x) <= 1e-6)) else round(x, 2)
+    )
 
     return df
 
 
 def ranking(results: pd.DataFrame, sorting_method: str, min_stock_price: float) -> dict:
+    """
+    Rank results for each columns except 'stock__ticker' and return
+    as dict format
+    {
+        col_name: seperated_result,
+        col_name: seperated_result, ...
+    }
+    """
     seperated_results = {}
     ascending = True if sorting_method == "Ascending" else False
     for col in results.columns:
@@ -732,7 +758,7 @@ def ranking(results: pd.DataFrame, sorting_method: str, min_stock_price: float) 
         result = results[["stock__ticker", col]].dropna()
         result = result[result[col] != 0]
         seperated_results[col] = result[["stock__ticker", col]].sort_values(
-            by=col, ascending=ascending
+            by=col, ascending=ascending, key=lambda x: pd.to_numeric(x, errors="coerce")
         )
 
     return seperated_results
@@ -741,7 +767,9 @@ def ranking(results: pd.DataFrame, sorting_method: str, min_stock_price: float) 
 def get_performance(
     result_subset: dict, pos_hold: int
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-
+    """
+    Calculate performance and split it to top and bottom stocks.
+    """
     # Calculate performance
     for date, df in result_subset.items():
         # Get ticker list
@@ -754,7 +782,7 @@ def get_performance(
         last_day = monthrange(start_date.year, start_date.month)[-1]
         end_date = start_date.replace(day=last_day)
 
-        # Query database
+        # Query database by ticker_list and date
         query_res = CandleStick.objects.filter(
             stock__ticker__in=ticker_list,
             date__gte=start_date,
@@ -776,7 +804,7 @@ def get_performance(
                 list(query_res.values("stock__ticker", "date", "open", "close"))
             )
 
-            # Calculation
+            # Calculate performance
             performance = (
                 df_prices.groupby("stock__ticker")
                 .apply(
@@ -811,6 +839,9 @@ def get_performance(
 
 
 def get_average_performance(df: pd.DataFrame):
+    """
+    Add row "Average" for all 'performance' columns.
+    """
     perf_cols = [col for col in df.columns if "performance" in col]
     df.loc["Average"] = df[perf_cols].mean().astype(float).round(2)
 
@@ -831,7 +862,7 @@ def get_mdd(series: pd.Series) -> float:
 
 
 def get_risk_to_return_ratio(mdd: float, series: pd.Series) -> float:
-    """Total return divide by max drawdown"""
+    """Total return divided by max drawdown"""
     series.dropna(inplace=True)
     return round(series.iloc[-1] / mdd, 2)
 
@@ -840,9 +871,8 @@ def get_risk_to_return_ratio(mdd: float, series: pd.Series) -> float:
 @require_POST
 def search_method(request):
     """
-    Search the method in Income Statement, Balance Sheet and Cash Flow, and return to the front-end.
-    :param request: Request
-    :return: {result: [method1, method2, ...]}
+    Search data names in Income Statement, Balance Sheet and Cash Flow, by "search_text".
+    Return JsonResponse with a list of data name.
     """
     search_str = json.loads(request.body).get("search_text")
     if search_str.strip() == "":
@@ -877,6 +907,9 @@ def search_method(request):
 
 @require_POST
 def update_stock_numbers(request):
+    """
+    Get number of stock by "market-cap", "sectors".
+    """
     # Get params from frontend
     data = json.loads(request.body)
     selected_market_cap = data.get("market_cap")
@@ -884,19 +917,21 @@ def update_stock_numbers(request):
     if "All" in selected_sectors:
         selected_sectors.remove("All")
 
-    # Get US stocks
-    stocks = get_us_stocks(
-        market_cap_filter=selected_market_cap, sector_filter=selected_sectors
-    )
+    # Get US stocks by market_cap and sectors
+    try:
+        stocks = get_us_stocks(selected_market_cap, selected_sectors)
+    except Exception as e:
+        logging.warning(f"Error fetching US stocks for {selected_market_cap} and {selected_sectors}. ({e})")
+        return JsonResponse({"status": 404})
 
     result = {}
 
-    # Update stocks by sector
+    # Update result by sector
     for sector in sectors:
         result[sector] = len(stocks[stocks["sector"] == sector])
     result["All"] = sum(result.values())
 
-    # Update stocks by market cap
+    # Update result by market cap
     for mc in market_cap:
         if "Mega" in mc:
             result[mc] = len(stocks[stocks["market_cap"] >= market_cap[mc]])
@@ -911,11 +946,12 @@ def update_stock_numbers(request):
     return JsonResponse({"result": result})
 
 
-def export_csv(request):
+def export_csv(request) -> HttpResponse:
     """
-    Fetched from front end.
+    Get request.POST["table_data"], then calcualte execute position, and
+    create BasketTrader csv. Return HttpResponse with BasketTrader csv.
     """
-    # Get existing portfolio
+    # Get user uploaded portfolio
     file = None
     if request.FILES.get("file"):
         file = request.FILES["file"]
@@ -926,15 +962,22 @@ def export_csv(request):
         if "Exit Price" in df_portfolio.columns:
             df_portfolio.loc[df_portfolio["Exit Price"].notna(), "Position"] = 0
 
+        # Extract columns: Financial Instrument, Position
         df_portfolio = df_portfolio[["Financial Instrument", "Position"]]
+
+        # Get ticker
         df_portfolio["Financial Instrument"] = (
             df_portfolio["Financial Instrument"].str.split(" ").str[0]
         )
-        replace_position = {"K": 1000, "M": 1000000, "'": "", ",": ""}
-        df_portfolio["Position"] = df_portfolio["Position"].replace(np.nan, 0)
+
+        # Replace K/k, M/m, to 000, 000,000 in column "Position"
+        replace_position = {"K": 1000, "k": 1000, "M": 1000000, "m": 1000000,"'": "", ",": ""}
+        df_portfolio["Position"].fillna(0, inplace=True)
         df_portfolio["Position"] = (
             df_portfolio["Position"].replace(replace_position, regex=True).astype(int)
         )
+
+        # Rename columns
         df_portfolio.rename(
             columns={"Financial Instrument": "Ticker", "Position": "Existing Position"},
             inplace=True,
@@ -943,18 +986,25 @@ def export_csv(request):
         logging.warning(f"Error: {e}")
         df_portfolio = pd.DataFrame(columns=["Ticker", "Existing Position"])
 
-    # Get top and bottom stocks from backtest results
+    # Get long and short data from "table_data"
     data = json.loads(request.POST["table_data"])
 
-    # Convert to dataframe for top stocks
+    # Get amount from user input
     amount = abs(int(request.POST["amount"]))
-    df_top_stocks = convert_backtest_table_to_dataframe(data["long_table"], amount)
-    df_bottom_stocks = convert_backtest_table_to_dataframe(data["short_table"], amount)
-    df_bottom_stocks["Expected Position"] = -df_bottom_stocks["Expected Position"]
 
-    # Calculate execute position (to close the unnecessary positions from existing positions)
-    df_execute = pd.concat([df_top_stocks, df_bottom_stocks], ignore_index=True)
+    # Create DataFrame for long and short stocks with columns: 
+    # Amount(USD), Prev Close and Expected Position
+    df_long = get_expected_position(data["long_table"], amount // 2)
+    df_short = get_expected_position(data["short_table"], amount // 2)
+    df_short["Expected Position"] = -df_short["Expected Position"]
+
+    # Combine long and short data
+    df_execute = pd.concat([df_long, df_short], ignore_index=True)
+
+    # Merge user uploaded portfolio, or blank dataframe to df_execute
     df_execute = pd.merge(df_execute, df_portfolio, on="Ticker", how="outer")
+    
+    # Calculate "Execute Position"
     df_execute["Existing Position"] = (
         df_execute["Existing Position"].infer_objects(copy=False).fillna(0)
     )
@@ -964,8 +1014,14 @@ def export_csv(request):
     df_execute["Execute Position"] = (
         df_execute["Expected Position"].astype(float) - df_execute["Existing Position"]
     )
+
+    # Format column: Execute Position
     df_execute["Execute Position"] = df_execute["Execute Position"].round(2)
+    
+    # Extract columns: Ticker, Execute Position
     df_execute = df_execute[["Ticker", "Execute Position"]]
+    
+    # Drop rows with "Execute Position" = 0
     df_execute = df_execute[df_execute["Execute Position"] != 0]
 
     # Create basket trader dataframe
@@ -1004,7 +1060,7 @@ def export_csv(request):
     df_basket_trader["UsePriceMgmtAlgo"] = "TRUE"
     df_basket_trader["OutsideRth"] = "FALSE"
 
-    # Write csv response
+    # Create HttpResponse
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="basket_trader.csv"'
     writer = csv.writer(response)
@@ -1015,16 +1071,38 @@ def export_csv(request):
     return response
 
 
-def convert_backtest_table_to_dataframe(tables: list, amount: int) -> pd.DataFrame:
-    # loop through the first table and the second level of columns
-    columns = []
-    for col in tables[0][1]:
-        # Replace the column 'Value' to the first level of columns of the first table (date string)
-        columns.append(col) if col != "Value" else columns.append(tables[0][0].pop(0))
+def get_expected_position(l_tables: list, amount: int) -> pd.DataFrame:
+    """
+    Convert frontend data to dataframe, and calculate expected position for the latest period.
+    Params:
+        l_table: [
+            [[Apr 2024,               May, 2025,              ...],   # [0][0]
+             [Ticker, Value, Perf(%), TIcker, Value, Perf(%), ...],   # [0][1]
+             [AAPL,   0.00,  0.00,    GOOGL,  0.00,  0.00,    ... ],  # [0][2]
+             [NVDA,   0.00,  0.00,    META,  0.00,  0.00,    ... ],   # [0][3]
+             ...],
+            [[...]], # [1]
+            ...
+        ]
+        amount: "Total Amount" from user input
+    """
 
-    # Append to dataframe
+    def search_date_string(string: str) -> bool:
+        """Return true if string is the format of %b %Y."""
+        pattern = r"^[A-Za-z]{3} \d{4}$"
+        match = re.match(pattern, string)
+        
+        return bool(match)
+    
+    # Create columns list from l_tables[0][1]
+    columns = []
+    for col in l_tables[0][1]:
+        # Replace the column 'Value' to date string
+        columns.append(col) if col != "Value" else columns.append(l_tables[0][0].pop(0))
+
+    # Create DataFrame for l_tables
     df = pd.DataFrame(columns=columns)
-    for table in tables:
+    for table in l_tables:
         # Exclude the first 2 rows, they are column names
         df = pd.concat([df, pd.DataFrame(columns=columns, data=table[2:])])
 
@@ -1034,15 +1112,10 @@ def convert_backtest_table_to_dataframe(tables: list, amount: int) -> pd.DataFra
     # Remove empty rows
     df = df[df["Ticker"] != ""]
 
-    # Assign amount for each stock
-    df["Amount(USD)"] = amount // 2 // len(df)
+    # Assign amount for each stock (average amount for long and short stocks)
+    df["Amount(USD)"] = amount // len(df)
 
     # Get date string from df.columns
-    def search_date_string(string: str) -> bool:
-        pattern = r"^[A-Za-z]{3} \d{4}$"
-        match = re.match(pattern, string)
-        return bool(match)
-
     date_str = None
     for col in df.columns:
         if search_date_string(col):
@@ -1071,13 +1144,10 @@ def convert_backtest_table_to_dataframe(tables: list, amount: int) -> pd.DataFra
         inplace=True,
     )
 
-    # Add it to the main dataframe
+    # Merge prev_close to the main dataframe
     df = df.merge(df_prev_close, on="Ticker")
 
     # Assign position for each stock
     df["Expected Position"] = df["Amount(USD)"] / df["Prev Close"]
 
     return df
-
-
-# todo: peer review

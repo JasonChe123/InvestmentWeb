@@ -26,7 +26,6 @@ GAAP_TO_READABLE_NAME_INCOME_STATEMENT = {
     "CommonStockDividendsPerShareDeclared": "DividendsPerShareDPS",
 }
 GAAP_TO_READABLE_NAME_BALANCE_SHEET = {
-    "CashAndCashEquivalentsAtCarryingValue": "CashAndCashEquivalents",
     "CashAndCashEquivalentsAtCarryingValue": "ReceivablesNet",
     "InventoryNet": "Inventories",
     "PrepaidExpenseAndOtherAssetsCurrent": "PrepaidExpensesAndOther",
@@ -37,7 +36,6 @@ GAAP_TO_READABLE_NAME_BALANCE_SHEET = {
     "Goodwill": "Goodwill",
     "OtherAssetsNoncurrent": "OtherLongTermAssets",
     "Assets": "TotalAssets",
-    "ShortTermBorrowings": "ShortTermBorrowings",
     "AccountsPayableCurrent": "AccountsPayable",
     "DividendsPayableCurrent": "DividendsPayable",
     "AccruedLiabilitiesCurrent": "AccruedLiabilities",
@@ -77,7 +75,7 @@ GAAP_TO_READABLE_NAME_CASH_FLOW = {
     "NetCashProvidedByUsedInOperatingActivities": "OperatingCashFlow",
     "PaymentsToAcquirePropertyPlantAndEquipment": "PaymentsForPropertyAndEquipment",
     "ProceedsFromSaleOfPropertyPlantAndEquipment": "ProceedsFromDisposalOfPropertyAndEquipment",
-    "ProceedsFromDivestitureOfBusinesses": "ProceedsFfromDisposalOfCertainOperations",
+    "ProceedsFromDivestitureOfBusinesses": "ProceedsFromDivestitureOfBusinesses",
     "ProceedsFromSaleOfEquitySecuritiesFvNi": "ProceedsFromDisposalOfCertainStrategicInvestments",
     "PaymentsForProceedsFromOtherInvestingActivities": "OtherInvestingActivities",
     "NetCashProvidedByUsedInInvestingActivities": "InvestingCashFlow",
@@ -182,7 +180,6 @@ class BalanceSheet(models.Model):
     FiscalPeriod = models.CharField(max_length=5, blank=True, null=True)
 
     # Data downloaded from www.sec.gov
-    CashAndCashEquivalents = models.BigIntegerField(null=True)
     ReceivablesNet = models.BigIntegerField(null=True)
     Inventories = models.BigIntegerField(null=True)
     PrepaidExpensesAndOther = models.BigIntegerField(null=True)
@@ -193,7 +190,6 @@ class BalanceSheet(models.Model):
     Goodwill = models.BigIntegerField(null=True)
     OtherLongTermAssets = models.BigIntegerField(null=True)
     TotalAssets = models.BigIntegerField(null=True)
-    ShortTermBorrowings = models.BigIntegerField(null=True)
     AccountsPayable = models.BigIntegerField(null=True)
     DividendsPayable = models.BigIntegerField(null=True)
     AccruedLiabilities = models.BigIntegerField(null=True)
@@ -253,7 +249,7 @@ class CashFlow(models.Model):
     OperatingCashFlow = models.BigIntegerField(null=True)
     PaymentsForPropertyAndEquipment = models.BigIntegerField(null=True)
     ProceedsFromDisposalOfPropertyAndEquipment = models.BigIntegerField(null=True)
-    ProceedsFfromDisposalOfCertainOperations = models.BigIntegerField(null=True)
+    ProceedsFromDivestitureOfBusinesses = models.BigIntegerField(null=True)
     ProceedsFromDisposalOfCertainStrategicInvestments = models.BigIntegerField(
         null=True
     )
@@ -279,5 +275,4 @@ class CashFlow(models.Model):
     PropertyAndEquipmentNet = models.BigIntegerField(null=True)
 
     # Other important indicators calculated separately
-    CapitalExpenditure = models.BigIntegerField(null=True)
     FreeCashFlow = models.BigIntegerField(null=True)

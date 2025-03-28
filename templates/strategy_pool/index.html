@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load static %}
+
+<!-- Head -->
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/strategy_pool.css' %}">
+{% endblock head %}
+
+<!-- Title -->
+{% block title %}Strategies Pool{% endblock title %}
+
+<!-- Header -->
+{% block header %}
+<h1>Strategies Pool</h1>
+<p>Explore a variety of trading strategies to enhance your portfolio</p>
+<a href="{% url 'frontpage' %}" class="home-button">Home</a>
+{% endblock header %}
+
+<!-- Content -->
+{% block content %}
+<section class="strategies-container animate__animated animate__fadeIn">
+    {% for strategy in strategies %}
+    <div class="strategy-box">
+        <h3>{{ strategy.name }}</h3>
+        <p>{{ strategy.description }}</p>
+        {% if strategy.coming_soon %}
+        <span class="coming-soon">Coming Soon</span>
+        {% endif %}
+    </div>
+    {% endfor %}
+</section>
+{% endblock content %}

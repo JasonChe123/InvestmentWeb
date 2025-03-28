@@ -1,8 +1,111 @@
-{% extends 'base.html' %}
 {% load static %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block content %}
-<div class="p-5">
-    <h2>Make Some Money</h2>
-</div>
-{% endblock content %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Backtest strategies, export virtual trading orders, and access exclusive virtual portfolios.">
+    <title>Algo Backtesting - Optimize Your Strategies</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/all.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/animate.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/front_page.css' %}">
+</head>
+
+<body>
+    <header class="animate__animated animate__fadeInDown">
+        <h1>Algo Backtesting Platform</h1>
+        <p>Optimize your strategies and explore virtual portfolios</p>
+    </header>
+    
+    <section class="hero animate__animated animate__fadeIn">
+        <h2>Empower Your Trading Strategies</h2>
+        <p>Backtest strategies, export trading orders, and gain insights from exclusive portfolios.</p>
+        <a href="#features" class="animate__animated animate__pulse animate__infinite">Explore Strategies</a>
+    </section>
+    
+    <section id="carousel" class="carousel slide animate__animated animate__fadeIn" data-bs-ride="carousel">
+        <!-- Indicators -->
+        <div class="carousel-indicators">
+            <button type="button" data-bs-target="#carousel" data-bs-slide-to="0" class="active" aria-current="true"
+                aria-label="Slide 1"></button>
+            <button type="button" data-bs-target="#carousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
+            <button type="button" data-bs-target="#carousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
+            <button type="button" data-bs-target="#carousel" data-bs-slide-to="3" aria-label="Slide 4"></button>
+        </div>
+
+        <!-- Carousel Items -->
+        <div class="carousel-inner">
+            <div class="carousel-item active">
+                <img src="{% static 'images/frontpage_carousel_1.jpg' %}" alt="Build Your Own Strategies"
+                    class="d-block w-100">
+                <div class="carousel-caption">
+                    <h5>Build Your Own Strategies</h5>
+                    <p>Create and customize trading strategies tailored to your needs.</p>
+                </div>
+            </div>
+            <div class="carousel-item">
+                <img src="{% static 'images/frontpage_carousel_2.jpg' %}" alt="Export CSV for Interactive Brokers"
+                    class="d-block w-100">
+                <div class="carousel-caption">
+                    <h5>Export Trading File for Interactive Brokers</h5>
+                    <p>Use exported CSV files as trading order files For Interactive Brokers.</p>
+                </div>
+            </div>
+            <div class="carousel-item">
+                <img src="{% static 'images/frontpage_carousel_3.jpg' %}" alt="Monitor Your Strategies"
+                    class="d-block w-100">
+                <div class="carousel-caption">
+                    <h5>Monitor Your Strategies</h5>
+                    <p>Track the performance of your strategies with real-time insights.</p>
+                </div>
+            </div>
+            <div class="carousel-item">
+                <img src="{% static 'images/frontpage_carousel_4.jpg' %}" alt="Access Demo Portfolio"
+                    class="d-block w-100">
+                <div class="carousel-caption">
+                    <h5>Access Portfolio From Other Users</h5>
+                    <p>Explore other users' virtual portfolio.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <button class="carousel-control-prev" type="button" data-bs-target="#carousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Previous</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#carousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Next</span>
+        </button>
+    </section>
+    
+    <section id="features" class="features">
+        <div class="feature animate__animated animate__zoomIn">
+            <i class="fas fa-chart-bar"></i>
+            <h3>Backtesting Tools</h3>
+            <p>Test your strategies with historical data to optimize performance.</p>
+        </div>
+        <div class="feature animate__animated animate__zoomIn" style="animation-delay: 0.2s;">
+            <i class="fas fa-file-export"></i>
+            <h3>Export Virtual Orders</h3>
+            <p>Export virtual trading orders for further analysis and tracking.</p>
+        </div>
+        <div class="feature animate__animated animate__zoomIn" style="animation-delay: 0.4s;">
+            <i class="fas fa-user-tie"></i>
+            <h3>Exclusive Portfolios</h3>
+            <p>Access popular portfolios shared from other users.</p>
+        </div>
+    </section>
+
+    <footer class="animate__animated animate__fadeInUp">
+        <p>&copy; 2025 Algo Backtesting Platform. All rights reserved.</p>
+    </footer>
+
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+</body>
+
+</html>

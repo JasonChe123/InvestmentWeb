@@ -1,4 +1,4 @@
-<div class="logo-container">
+<a class="logo-container" href="{% url 'frontpage' %}">
     <div class="logo-icon">
         <div class="inner-circle"></div>
     </div>
@@ -7,14 +7,15 @@
         <br>
         <p>Where Strategies Evolve</p>
     </div>
-</div>
+</a>
 
 <style>
     .logo-container {
+        width: 50%;
         display: flex;
         align-items: center;
         gap: 10px;
-        width: 50%;
+        text-decoration: none;
     }
 
     .logo-icon {

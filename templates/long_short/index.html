@@ -1,246 +1,266 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Long Short{% endblock title %}
 
-{% block content %}
+<!-- Head -->
+{% block head %}
+<script src="{% static 'js/_partials/Chart.js' %}"></script>
+{% endblock head %}
+
+<!-- TItle -->
+{% block title %}Long Short Equity Strategy{% endblock title %}
+
+<!-- Header -->
+{% block header %}
+<h1>Long Short Equity Strategy</h1>
+<p>Analyze and optimize your strategy, leveraging data-driven insights, maximize returns and minimize risks.</p>
+{% endblock header %}
+
 <!-- Content -->
-<div>
-    <!-- Modal (export basket trader) -->
-    {% include 'long_short/export_basket_trader_modal.html' %}
+{% block content %}
+<!-- Main content -->
+<div class="container-fluid mb-5 p-3">
+    <div>
+        <!-- Modal (export basket trader) -->
+        {% include 'long_short/export_basket_trader_modal.html' %}
 
-    <!-- Modal (important information) -->
-    {% include 'long_short/info_modal.html' %}
+        <!-- Modal (important information) -->
+        {% include 'long_short/info_modal.html' %}
 
-    <!-- Modal (loading) -->
-    {% include 'partials/_loading_modal.html' %}
+        <!-- Modal (loading) -->
+        {% include 'partials/_loading_modal.html' %}
 
-    <!-- Input params -->
-    {% include 'long_short/input_parameters.html' %}
+        <!-- Input params -->
+        {% include 'long_short/input_parameters.html' %}
 
-    <!-- Backtest result -->
-    {% if result %}
+        <!-- Backtest result -->
+        {% if result %}
 
-    <!-- Summary -->
-    <div class="mb-5">
+        <!-- Summary -->
+        <div class="mb-5">
 
-        <!-- Title -->
-        <div class="my-5">
-            <h4 class="my-3">
-                Backtest Result for Top {{ selected_pos_hold }} and Bottom {{ selected_pos_hold }} Stocks<br>
-            </h4>
-            <h5>
-                Ranked by - {{ selected_method }}
-            </h5>
-            <ul>
-                <li>(Stocks are omitted if the stock price is under ${{ selected_min_stock_price|floatformat:"0" }})
-                </li>
-            </ul>
+            <!-- Title -->
+            <div class="my-5">
+                <h4 class="my-3">
+                    Backtest Result for Top {{ selected_pos_hold }} and Bottom {{ selected_pos_hold }}
+                    Stocks<br>
+                </h4>
+                <h5>
+                    Ranked by - {{ selected_method }}
+                </h5>
+                <ul>
+                    <li>(Stocks are omitted if the stock price is under ${{ selected_min_stock_price|floatformat:"0" }})
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Summary table -->
+            <div>
+                <table class="table table-bordered table-hover custom-shadow">
+                    <!-- Header -->
+                    <thead>
+                        <tr>
+                            <th class="text-center">Sector</th>
+                            <th class="text-center">Top Stocks Perf(%)</th>
+                            <th class="text-center">Bottom Stocks Perf(%)</th>
+                            <th class="text-center">Total Perf(%)<br>(Buy Top Stocks,<br>ShortSell Bottom
+                                Stocks)</th>
+                            <th class="text-center">Annualized Perf(%)</th>
+                            <th class="text-center">MaxDrawDown(%)</th>
+                            <th class="text-center">Risk to Return</th>
+                        </tr>
+                    </thead>
+
+                    <!-- Data -->
+                    <tbody>
+                        <!-- For individual sectors -->
+                        {% for d in data %}
+                        <tr>
+                            <th class="summary">{{ d.sector }}</th>
+                            <td class="summary">{{ d.long_total }}%</td>
+                            <td class="summary">{{ d.short_total }}%</td>
+                            <td class="summary">{{ d.longshort_total }}%</td>
+                            <td class="summary">{{ d.longshort_annualized }}%</td>
+                            <td class="summary">{{ d.mdd }}%</td>
+                            <td class="summary">{{ d.rtr }}</td>
+                        </tr>
+                        {% endfor %}
+
+                        <!-- Total -->
+                        <tr>
+                            <th class="summary">Total</th>
+                            <td class="summary">{{ long_total }}%</td>
+                            <td class="summary">{{ short_total }}%</td>
+                            <td class="summary">{{ longshort_total }}%</td>
+                            <td class="summary">{{ longshort_annualized }}%</td>
+                            <td class="summary"></td>
+                            <td class="summary"></td>
+                        </tr>
+
+                        <!-- For S&P 500 -->
+                        <tr>
+                            <th class="summary">S&P 500</th>
+                            <td class="summary"></td>
+                            <td class="summary"></td>
+                            <td class="summary">{{ sp500_total }}%</td>
+                            <td class="summary">{{ sp500_annualized }}%</td>
+                            <td class="summary">{{ sp500_mdd }}%</td>
+                            <td class="summary">{{ sp500_rtr}}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Export button -->
+            <button class="btn btn-primary h-50" data-bs-toggle="modal" data-bs-target="#basket-trader-modal">
+                Export csv File
+            </button>
         </div>
 
-        <!-- Summary table -->
-        <div>
-            <table class="table table-bordered table-hover custom-shadow">
-                <!-- Header -->
-                <thead>
-                    <tr>
-                        <th class="text-center">Sector</th>
-                        <th class="text-center">Top Stocks Perf(%)</th>
-                        <th class="text-center">Bottom Stocks Perf(%)</th>
-                        <th class="text-center">Total Perf(%)<br>(Buy Top Stocks,<br>ShortSell Bottom Stocks)</th>
-                        <th class="text-center">Annualized Perf(%)</th>
-                        <th class="text-center">MaxDrawDown(%)</th>
-                        <th class="text-center">Risk to Return</th>
-                    </tr>
-                </thead>
+        <!-- Chart -->
+        <div class="mb-5 p-3 border border-primary rounded-3">
+            <canvas id="performance-chart" class="h-75 w-100"></canvas>
+        </div>
 
-                <!-- Data -->
-                <tbody>
-                    <!-- For individual sectors -->
+        <!-- Result by sector -->
+        <div class="row">
+            <div class="col-md-12">
+                <!-- Tabs -->
+                <ul class="nav nav-tabs" id="sectorTabs" role="tablist">
                     {% for d in data %}
-                    <tr>
-                        <th class="summary">{{ d.sector }}</th>
-                        <td class="summary">{{ d.long_total }}%</td>
-                        <td class="summary">{{ d.short_total }}%</td>
-                        <td class="summary">{{ d.longshort_total }}%</td>
-                        <td class="summary">{{ d.longshort_annualized }}%</td>
-                        <td class="summary">{{ d.mdd }}%</td>
-                        <td class="summary">{{ d.rtr }}</td>
-                    </tr>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if forloop.first %}active{% endif %}" id="tab-{{ d.sector|slugify }}"
+                            data-bs-toggle="tab" data-bs-target="#content-{{ d.sector|slugify }}" type="button"
+                            role="tab" aria-controls="content-{{ d.sector|slugify }}"
+                            aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
+                            {{ d.sector }}</button>
+                    </li>
                     {% endfor %}
+                </ul>
 
-                    <!-- Total -->
-                    <tr>
-                        <th class="summary bg-primary-subtle">Total</th>
-                        <td class="summary bg-primary-subtle">{{ long_total }}%</td>
-                        <td class="summary bg-primary-subtle">{{ short_total }}%</td>
-                        <td class="summary bg-primary-subtle">{{ longshort_total }}%</td>
-                        <td class="summary bg-primary-subtle">{{ longshort_annualized }}%</td>
-                        <td class="summary bg-primary-subtle"></td>
-                        <td class="summary bg-primary-subtle"></td>
-                    </tr>
+                <!-- Content -->
+                <div class="tab-content" id="sectorTabsContent">
+                    {% for d in data %}
+                    <div class="tab-pane fade {% if forloop.first %}show active{% endif %}"
+                        id="content-{{ d.sector|slugify }}" role="tabpanel"
+                        aria-labelledby="tab-{{ d.sector|slugify }}">
+                        <div class="p-3">
+                            <h5>Sector - {{ d.sector }}</h5>
+                            <ul>
+                                <li>
+                                    (Value: {{ selected_method }})
+                                </li>
+                            </ul>
 
-                    <!-- For S&P 500 -->
-                    <tr>
-                        <th class="summary bg-secondary-subtle">S&P 500</th>
-                        <td class="summary bg-secondary-subtle"></td>
-                        <td class="summary bg-secondary-subtle"></td>
-                        <td class="summary bg-secondary-subtle">{{ sp500_total }}%</td>
-                        <td class="summary bg-secondary-subtle">{{ sp500_annualized }}%</td>
-                        <td class="summary bg-secondary-subtle">{{ sp500_mdd }}%</td>
-                        <td class="summary bg-secondary-subtle">{{ sp500_rtr}}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+                            <div class="row">
+                                <div class="table-responsive">
+                                    <!-- Top stocks -->
+                                    <p>
+                                        Top {{ selected_pos_hold }} Stocks ( Total Performance
+                                        <b class="{% if d.long_total < 0 %}text-danger{% endif %}">{{ d.long_total }}</b> )
+                                    </p>
+                                    <table class="table table-striped border border-primary table-top"
+                                        style="table-layout: fixed;">
+                                        <thead>
+                                            <!-- Header row (date)-->
+                                            <tr>
+                                                {% for col in d.df_top.columns %}
+                                                {% if col != 'Ticker' and col != 'Perf(%)' %}
+                                                <th scope="col" class="text-center border border-primary th-lg"
+                                                    colspan="3" style="width: 250px;">{{ col }}</th>
+                                                {% endif %}
+                                                {% endfor %}
+                                            </tr>
 
-        <!-- Export button -->
-        <button class="btn btn-primary h-50" data-bs-toggle="modal" data-bs-target="#basket-trader-modal">
-            Export csv File
-        </button>
-    </div>
+                                            <!-- Header row (Ticker, Value, Perf(%)) -->
+                                            <tr>
+                                                {% for col in d.df_top.columns %}
+                                                {% if col != 'Ticker' and col != 'Perf(%)' %}
+                                                <th class="text-center th-lg">Value</th>
+                                                {% elif col == 'Perf(%)' %}
+                                                <th class="text-center border-end border-primary th-lg">{{ col }}</th>
+                                                {% else %}
+                                                <th class="text-center th-lg">{{ col }}</th>
+                                                {% endif %}
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
 
-    <!-- Chart -->
-    <div class="mb-5 p-3 border border-primary rounded-3">
-        <canvas id="performance-chart" class="h-75 w-100"></canvas>
-    </div>
-
-    <!-- Result by sector -->
-    <div class="row">
-        <div class="col-md-12">
-            <!-- Tabs -->
-            <ul class="nav nav-tabs" id="sectorTabs" role="tablist">
-                {% for d in data %}
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {% if forloop.first %}active{% endif %}" id="tab-{{ d.sector|slugify }}"
-                        data-bs-toggle="tab" data-bs-target="#content-{{ d.sector|slugify }}" type="button" role="tab"
-                        aria-controls="content-{{ d.sector|slugify }}"
-                        aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
-                        {{ d.sector }}</button>
-                </li>
-                {% endfor %}
-            </ul>
-
-            <!-- Content -->
-            <div class="tab-content" id="sectorTabsContent">
-                {% for d in data %}
-                <div class="tab-pane fade {% if forloop.first %}show active{% endif %}"
-                    id="content-{{ d.sector|slugify }}" role="tabpanel" aria-labelledby="tab-{{ d.sector|slugify }}">
-                    <div class="p-3">
-                        <h5>Sector - {{ d.sector }}</h5>
-                        <ul>
-                            <li>
-                                (Value: {{ selected_method }})
-                            </li>
-                        </ul>
-
-                        <div class="row">
-                            <div class="table-responsive">
-                                <!-- Top stocks -->
-                                <p>
-                                    Top {{ selected_pos_hold }} Stocks ( Total Performance
-                                    <b class="{% if d.long_total < 0 %}text-danger{% endif %}">{{ d.long_total }}</b> )
-                                </p>
-                                <table class="table table-striped border border-primary table-top"
-                                    style="table-layout: fixed;">
-                                    <thead>
-                                        <!-- Header row (date)-->
-                                        <tr>
-                                            {% for col in d.df_top.columns %}
-                                            {% if col != 'Ticker' and col != 'Perf(%)' %}
-                                            <th scope="col" class="text-center border border-primary th-lg" colspan="3"
-                                                style="width: 250px;">{{ col }}</th>
-                                            {% endif %}
+                                        <!-- Data -->
+                                        <tbody>
+                                            {% for i, row in d.df_top.iterrows %}
+                                            <tr>
+                                                {% for cell in row %}
+                                                <td>{{ cell }}</td>
+                                                {% endfor %}
+                                            </tr>
                                             {% endfor %}
-                                        </tr>
+                                        </tbody>
+                                    </table>
+                                    <br>
 
-                                        <!-- Header row (Ticker, Value, Perf(%)) -->
-                                        <tr>
-                                            {% for col in d.df_top.columns %}
-                                            {% if col != 'Ticker' and col != 'Perf(%)' %}
-                                            <th class="text-center th-lg">Value</th>
-                                            {% elif col == 'Perf(%)' %}
-                                            <th class="text-center border-end border-primary th-lg">{{ col }}</th>
-                                            {% else %}
-                                            <th class="text-center th-lg">{{ col }}</th>
-                                            {% endif %}
+                                    <!-- Bottom stocks -->
+                                    <p>
+                                        Bottom {{ selected_pos_hold }} Stocks ( Total Performance
+                                        <b class="{% if d.short_total < 0 %}text-danger{% endif %}">{{ d.short_total }}</b>)
+                                    </p>
+
+                                    <table class="table table-striped border border-primary table-bottom"
+                                        style="table-layout: fixed;">
+                                        <thead>
+                                            <!-- Header row (date)-->
+                                            <tr>
+                                                {% for col in d.df_bottom.columns %}
+                                                {% if col != 'Ticker' and col != 'Perf(%)' %}
+                                                <th scope="col" class="text-center border border-primary th-lg"
+                                                    colspan="3" style="width: 250px;">{{ col }}</th>
+                                                {% endif %}
+                                                {% endfor %}
+                                            </tr>
+
+                                            <!-- Header row (Ticker, Value, Perf(%)) -->
+                                            <tr>
+                                                {% for col in d.df_bottom.columns %}
+                                                {% if col != 'Ticker' and col != 'Perf(%)' %}
+                                                <th class="text-center th-lg">Value</th>
+                                                {% elif col == 'Perf(%)' %}
+                                                <th class="text-center border-end border-primary th-lg">{{ col }}</th>
+                                                {% else %}
+                                                <th class="text-center th-lg">{{ col }}</th>
+                                                {% endif %}
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+
+                                        <!-- Data -->
+                                        <tbody>
+                                            {% for i, row in d.df_bottom.iterrows %}
+                                            <tr>
+                                                {% for cell in row %}
+                                                <td>{{ cell }}</td>
+                                                {% endfor %}
+                                            </tr>
                                             {% endfor %}
-                                        </tr>
-                                    </thead>
-
-                                    <!-- Data -->
-                                    <tbody>
-                                        {% for i, row in d.df_top.iterrows %}
-                                        <tr>
-                                            {% for cell in row %}
-                                            <td>{{ cell }}</td>
-                                            {% endfor %}
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                                <br>
-
-                                <!-- Bottom stocks -->
-                                <p>
-                                    Bottom {{ selected_pos_hold }} Stocks ( Total Performance
-                                    <b class="{% if d.short_total < 0 %}text-danger{% endif %}">{{ d.short_total }}</b>)
-                                </p>
-
-                                <table class="table table-striped border border-primary table-bottom"
-                                    style="table-layout: fixed;">
-                                    <thead>
-                                        <!-- Header row (date)-->
-                                        <tr>
-                                            {% for col in d.df_bottom.columns %}
-                                            {% if col != 'Ticker' and col != 'Perf(%)' %}
-                                            <th scope="col" class="text-center border border-primary th-lg" colspan="3"
-                                                style="width: 250px;">{{ col }}</th>
-                                            {% endif %}
-                                            {% endfor %}
-                                        </tr>
-
-                                        <!-- Header row (Ticker, Value, Perf(%)) -->
-                                        <tr>
-                                            {% for col in d.df_bottom.columns %}
-                                            {% if col != 'Ticker' and col != 'Perf(%)' %}
-                                            <th class="text-center th-lg">Value</th>
-                                            {% elif col == 'Perf(%)' %}
-                                            <th class="text-center border-end border-primary th-lg">{{ col }}</th>
-                                            {% else %}
-                                            <th class="text-center th-lg">{{ col }}</th>
-                                            {% endif %}
-                                            {% endfor %}
-                                        </tr>
-                                    </thead>
-
-                                    <!-- Data -->
-                                    <tbody>
-                                        {% for i, row in d.df_bottom.iterrows %}
-                                        <tr>
-                                            {% for cell in row %}
-                                            <td>{{ cell }}</td>
-                                            {% endfor %}
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
         </div>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
+{% endblock content %}
 
 <!-- Script -->
+{% block script %}
 <script src="{% static 'js/longshort/longshort.js' %}" id="longshort-js" csrf_token="{{ csrf_token }}"
     result="{{ result }}"></script>
 {% if result %}
 <script src="{% static 'js/longshort/chart.js' %}" id="longshort-chart-js" chartData="{{ chart_data }}"
     selectedMethod="{{ selected_method }}"></script>
 {% endif %}
-
-{% endblock content %}
+{% endblock script %}

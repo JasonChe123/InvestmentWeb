@@ -1,48 +1,28 @@
-$(document).ready(function () {
-    // Theme toggling
-    const themeToggle = $('.theme-toggle');
-    const icon = themeToggle.find('i');
-    const themeText = themeToggle.find('b')
-    const htmlElement = $('html');
-    const sidebarToggleBtn = $('#sidebar-toggle-btn');
-    const sidebar = $('#sidebar');
+// Dark Mode Toggle
+const darkModeToggle = document.getElementById('dark-mode-toggle');
 
-    function setTheme(isDark) {
-        htmlElement.attr('data-bs-theme', isDark ? 'dark' : 'light');
-        icon.removeClass(isDark ? 'fa-sun' : 'fa-moon');
-        icon.addClass(isDark ? 'fa-moon' : 'fa-sun');
-        themeText.text(isDark ? 'Dark' : 'Light');
-        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+darkModeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('dark-mode');
+    if (document.body.classList.contains('dark-mode')) {
+        darkModeToggle.textContent = 'Light';
+        localStorage.setItem('theme', 'dark');
+    } else {
+        darkModeToggle.textContent = 'Dark';
+        localStorage.setItem('theme', 'light');
     }
-
-    // ToggleTheme button
-    themeToggle.click(function () {
-        const isDark = htmlElement.attr('data-bs-theme') === 'dark';
-        setTheme(!isDark);
-    });
-
-    // Toogle sidebar
-    function toggleSidebar() {
-        if (sidebar.width() > 60) {
-            sidebar.width("60px");
-            sidebarToggleBtn.text(">");
-        } else {
-            sidebar.width("300px");
-            sidebarToggleBtn.text("<");
-        }
-    }
-
-    // Sidebar toggling
-    sidebar.css({ "transition": "width 0.5s ease" });
-    sidebar.find("a").css({
-        "white-space": 'nowrap',
-    });
-    sidebarToggleBtn.click(function () {
-        toggleSidebar();
-    });
-    sidebar.find("button").click(function () {
-        if (!(sidebar.width() > 60)) {
-            toggleSidebar();
-        }
-    });
 });
+
+// Detect current theme
+function isDarkTheme() {
+    return localStorage.getItem('theme') === 'dark';
+}
+
+// Set theme in line with current theme
+const isDark = isDarkTheme();
+if (isDark && !document.body.classList.contains('dark-mode')) {
+    document.body.classList.toggle('dark-mode');
+} else {
+    if (!isDark && document.body.classList.contains('dark-mode')) {
+        document.body.classList.toggle('dark-mode');
+    }
+}

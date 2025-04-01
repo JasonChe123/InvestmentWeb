@@ -78,6 +78,7 @@ function main() {
 
     // Update chart theme
     function updateChartTheme(isDark) {
+        console.log("updateChartTheme", isDark);
         chart.options.scales.yAxes[0].ticks.fontColor = isDark ? '#ffffff' : '#000000';
         chart.options.scales.xAxes[0].ticks.fontColor = isDark ? '#ffffff' : '#000000';
         chart.data.datasets.forEach((dataset, index) => {
@@ -116,9 +117,9 @@ function main() {
     }
 
     // Event listener for theme switch button
-    $('.theme-toggle').click(function () {
+    $('#dark-mode-toggle').click(function () {
         const isDark = isDarkTheme();
-        updateChartTheme(!isDark);
+        updateChartTheme(isDark);
     });
 
     // Set theme in line with current theme

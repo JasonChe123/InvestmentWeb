@@ -12,26 +12,60 @@
     <link rel="stylesheet" href="{% static 'css/all.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/animate.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <script src="{% static 'js/jquery-3.6.0.min.js' %}"></script>
     {% block head %}{% endblock head %}
 </head>
 
 <body>
     <header class="animate__animated animate__fadeInDown">
-        <div class="logo-wrapper">
-            {% include 'partials/_logo.html' %}
+        <div class="d-flex flex-wrap p-3 w-100">
+            <!-- Logo -->
+            <div class="logo-wrapper">
+                {% include 'partials/_logo.html' %}
+            </div>
+
+            <!-- Header content -->
+            <div class="header-content"">
+                {% block header %}{% endblock header %}
+            </div>
         </div>
-        <div class="header-content"">
-            {% block header %}{% endblock header %}
-        </div>
+
+        <!-- Navigation Bar -->
+        <nav class="navbar navbar-expand-lg p-0">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'frontpage' %}">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'strategy_pool' %}">Strategies</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">Client Area</a>
+                    </li>
+                    <li class="nav-item">
+                        <a id="dark-mode-toggle" class="dark-mode-toggle nav-link" href="#">Dark</a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
     </header>
 
-    {% block content %}{% endblock content %}
+    <main>
+        {% block content %}{% endblock content %}
+    </main>
 
-    <footer class="animate__animated animate__fadeInUp" style="position: fixed; bottom: 0; width: 100%;">
+    <footer class="animate__animated animate__fadeInUp">
         <p>&copy; 2025 AlgoAnywhere. All rights reserved.</p>
     </footer>
 
-    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src=" {% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src=" {% static 'js/base.js' %}"></script>
+    {% block script %}{% endblock script %}
 </body>
 
 </html>

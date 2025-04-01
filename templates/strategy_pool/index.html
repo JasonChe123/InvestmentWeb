@@ -13,20 +13,19 @@
 {% block header %}
 <h1>Strategies Pool</h1>
 <p>Explore a variety of trading strategies to enhance your portfolio</p>
-<a href="{% url 'frontpage' %}" class="home-button">Home</a>
 {% endblock header %}
 
 <!-- Content -->
 {% block content %}
 <section class="strategies-container animate__animated animate__fadeIn">
     {% for strategy in strategies %}
-    <div class="strategy-box">
+    <a class="strategy-box" {% if not strategy.coming_soon %} href="{% url strategy.link %} {% endif %}">
         <h3>{{ strategy.name }}</h3>
         <p>{{ strategy.description }}</p>
         {% if strategy.coming_soon %}
         <span class="coming-soon">Coming Soon</span>
         {% endif %}
-    </div>
+    </a>
     {% endfor %}
 </section>
 {% endblock content %}

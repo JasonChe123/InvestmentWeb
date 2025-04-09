@@ -21,9 +21,10 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('frontpage.urls')),
-    path('strategy_pool/', include('strategy_pool.urls')),
-    path('financial_weather/', include('financial_weather.urls')),
     path('accounts/', include('allauth.urls')),
+    path('client_area/', include('client_area.urls')),
+    path('strategy_pool/', include('strategy_pool.urls')),
     path('long_short/', include('long_short_strategy.urls')),
-    path('performance/', include('performance.urls')),
+    # path('performance/', include('performance.urls')),
+    # path('financial_weather/', include('financial_weather.urls')),
 ]

@@ -4,10 +4,13 @@ import csv
 import datetime as dt
 from dateutil.relativedelta import relativedelta
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.template.context_processors import csrf
+from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.http import require_POST
 import json
@@ -24,6 +27,12 @@ import pandas as pd
 import pdb
 import re
 from typing import Tuple
+from .models import MyStrategy
+
+
+# todo:
+# 1. Order: Type: REL, Price 5% from previous close, allow outside RTH, Aux. Price 0.01, round qty to nearest decimal if possible
+# 2. Ignore any order if its amount is less $100
 
 
 market_cap = {
@@ -50,6 +59,7 @@ sectors = [
 ]
 
 
+@method_decorator(login_required, name="dispatch")
 class BackTestView(View):
     def __init__(self):
         super().__init__()
@@ -141,13 +151,14 @@ class BackTestView(View):
         return render(request, "long_short/index.html", self.html_context)
 
     def post(self, request):
+        """Start backtesting"""
         # Get user's inputs
         market_cap = request.POST.getlist("market-cap")
         method = request.POST.get("selected-method").rstrip("+-*/")
         sectors = [s for s in self.sectors if request.POST.get(s)]
         backtest_years = int(request.POST.get("backtest_years"))
         pos_hold = int(request.POST.get("pos_hold"))
-        min_stock_price = float(request.POST.get("min_stock_price"))
+        min_stock_price = int(request.POST.get("min_stock_price"))
         sorting_method = request.POST.get("sorting_method")
 
         # Add to context
@@ -225,6 +236,17 @@ class BackTestView(View):
                     if i["sector"] == col.replace("_Total", ""):
                         i["mdd"] = mdd
                         i["rtr"] = rtr
+
+        # Get a list of sectors from MyStrategy
+        my_strategy = get_my_strategy(
+            request.user,
+            market_cap,
+            pos_hold,
+            min_stock_price,
+            sorting_method.lower() == "ascending",
+            method,
+        )
+        self.html_context["my_strategy"] = my_strategy
 
         # Update html context
         self.html_context["result"] = True
@@ -381,7 +403,9 @@ class BackTestView(View):
                     or columns[1] not in matching_columns
                     or columns[2] != "Perf(%)"
                 ):
-                    logging.error(f"Invalid columns: {columns} from {df_data.columns}. Please Check!")
+                    logging.error(
+                        f"Invalid columns: {columns} from {df_data.columns}. Please Check!"
+                    )
                     return False
 
                 # Initialize dataframe
@@ -433,7 +457,7 @@ class BackTestView(View):
                 df_temp = df_temp[["date", result_col_name]]
 
                 # df_temp joins df_all
-                if df_temp.empty and df_all.empty:
+                if df_temp.empty:
                     continue
                 elif df_all.empty and not df_temp.empty:
                     df_all = df_temp.copy()
@@ -517,6 +541,30 @@ def separate_words(string: str) -> str:
     To separate words, e.g. from 'ResearchAndDevelopment' to 'Research And Development'
     """
     return re.sub(r"(?<![A-Z])(?=[A-Z])", " ", string).strip()
+
+
+def get_my_strategy(
+    user: User,
+    market_cap: list,
+    pos_side_per_sector: int,
+    min_stock_price: int,
+    sort_ascending: bool,
+    formula: str,
+) -> set:
+    """Return a set of sectors which matches the criteria'"""
+    res = MyStrategy.objects.filter(
+        user=user,
+        market_cap=market_cap,
+        position_side_per_sector=pos_side_per_sector,
+        min_stock_price=min_stock_price,
+        sort_ascending=sort_ascending,
+        formula=formula,
+    ).values_list("sector", flat=True)
+
+    if res.count() == 0:
+        return []
+
+    return [sector.replace("-", " ").title() for sector in res]
 
 
 def get_us_stocks(
@@ -735,7 +783,11 @@ def apply_formula(df: pd.DataFrame, formula: str, result_col_name: str) -> pd.Da
 
     # Format the result column values
     df[result_col_name] = df[result_col_name].apply(
-        lambda x: f"{x:.2e}" if (x != 0 and (abs(x) >= 1e6 or abs(x) <= 1e-6)) else round(x, 2)
+        lambda x: (
+            f"{x:.2e}"
+            if (x != 0 and (abs(x) >= 1e6 or abs(x) <= 1e-6))
+            else round(x, 2)
+        )
     )
 
     return df
@@ -867,85 +919,72 @@ def get_risk_to_return_ratio(mdd: float, series: pd.Series) -> float:
     return round(series.iloc[-1] / mdd, 2)
 
 
-# Functions fetched from front end --------------------------------------------
+# -----------------------------------------------------------------------------
+# | Functions fetched from front end                                          |
+# -----------------------------------------------------------------------------
 @require_POST
-def search_method(request):
-    """
-    Search data names in Income Statement, Balance Sheet and Cash Flow, by "search_text".
-    Return JsonResponse with a list of data name.
-    """
-    search_str = json.loads(request.body).get("search_text")
-    if search_str.strip() == "":
-        return JsonResponse({"result": []})
+@login_required
+def alter_my_strategy(request):
+    """Add/ Delete MyStrategy from the database."""
+    # Get request content
+    res_content = json.loads(request.body)
 
-    fields_income_statement = [
-        separate_words(field.name)
-        for field in IncomeStatement._meta.get_fields()
-        if field.concrete
-        and field.name
-        not in ("id", "stock", "FileDate", "StartDate", "EndDate", "FiscalPeriod")
-    ]
-    fields_balancesheet = [
-        separate_words(field.name)
-        for field in BalanceSheet._meta.get_fields()
-        if field.concrete
-        and field.name
-        not in ("id", "stock", "FileDate", "StartDate", "EndDate", "FiscalPeriod")
-    ]
-    fields_cashflow = [
-        separate_words(field.name)
-        for field in CashFlow._meta.get_fields()
-        if field.concrete
-        and field.name
-        not in ("id", "stock", "FileDate", "StartDate", "EndDate", "FiscalPeriod")
-    ]
-    all_fields = fields_income_statement + fields_balancesheet + fields_cashflow
-    results = [method for method in all_fields if search_str.lower() in method.lower()]
+    # Parse string to list
+    market_cap = res_content["market_cap"].replace("'", '"')
+    market_cap_list = json.loads(market_cap)
 
-    return JsonResponse({"result": list(set(sorted(results)))})
-
-
-@require_POST
-def update_stock_numbers(request):
-    """
-    Get number of stock by "market-cap", "sectors".
-    """
-    # Get params from frontend
-    data = json.loads(request.body)
-    selected_market_cap = data.get("market_cap")
-    selected_sectors = data.get("sectors")
-    if "All" in selected_sectors:
-        selected_sectors.remove("All")
-
-    # Get US stocks by market_cap and sectors
     try:
-        stocks = get_us_stocks(selected_market_cap, selected_sectors)
-    except Exception as e:
-        logging.warning(f"Error fetching US stocks for {selected_market_cap} and {selected_sectors}. ({e})")
-        return JsonResponse({"status": 404})
-
-    result = {}
-
-    # Update result by sector
-    for sector in sectors:
-        result[sector] = len(stocks[stocks["sector"] == sector])
-    result["All"] = sum(result.values())
-
-    # Update result by market cap
-    for mc in market_cap:
-        if "Mega" in mc:
-            result[mc] = len(stocks[stocks["market_cap"] >= market_cap[mc]])
+        if res_content["action"] == "add":
+            db_operation = MyStrategy.objects.update_or_create
+            status = "Created"
+            status_code = 201
+            message = f"Strategy < {res_content['sector']} > Added"
+            message_type = "success"
+        elif res_content["action"] == "delete":
+            db_operation = MyStrategy.objects.filter
+            status = "OK"
+            status_code = 200
+            message = f"Strategy < {res_content['sector']} > Deleted"
+            message_type = "warning"
         else:
-            result[mc] = len(
-                stocks[
-                    (stocks["market_cap"] >= market_cap[mc][0])
-                    & (stocks["market_cap"] < market_cap[mc][-1])
-                ]
-            )
+            raise
 
-    return JsonResponse({"result": result})
+        # Database operation
+        res = db_operation(
+            user=request.user,
+            market_cap=market_cap_list,
+            position_side_per_sector=int(res_content["pos_hold"]),
+            min_stock_price=int(res_content["min_stock_price"]),
+            sort_ascending=res_content["sorting_method"].lower() == "ascending",
+            sector=res_content["sector"],
+            formula=res_content["formula"],
+        )
+
+        if res_content["action"] == "delete":
+            res.delete()
+
+        return JsonResponse(
+            {
+                "status": status,
+                "message": message,
+                "message_type": message_type,
+            },
+            status=status_code,
+        )
+
+    except Exception as e:
+        return JsonResponse(
+            {
+                "status": "bad request",
+                "message": "Error editing My Strategy, please try again later.",
+                "message_type": "error",
+            },
+            status=400,
+        )
 
 
+@require_POST
+@login_required
 def export_csv(request) -> HttpResponse:
     """
     Get request.POST["table_data"], then calcualte execute position, and
@@ -971,7 +1010,14 @@ def export_csv(request) -> HttpResponse:
         )
 
         # Replace K/k, M/m, to 000, 000,000 in column "Position"
-        replace_position = {"K": 1000, "k": 1000, "M": 1000000, "m": 1000000,"'": "", ",": ""}
+        replace_position = {
+            "K": 1000,
+            "k": 1000,
+            "M": 1000000,
+            "m": 1000000,
+            "'": "",
+            ",": "",
+        }
         df_portfolio["Position"].fillna(0, inplace=True)
         df_portfolio["Position"] = (
             df_portfolio["Position"].replace(replace_position, regex=True).astype(int)
@@ -992,7 +1038,7 @@ def export_csv(request) -> HttpResponse:
     # Get amount from user input
     amount = abs(int(request.POST["amount"]))
 
-    # Create DataFrame for long and short stocks with columns: 
+    # Create DataFrame for long and short stocks with columns:
     # Amount(USD), Prev Close and Expected Position
     df_long = get_expected_position(data["long_table"], amount // 2)
     df_short = get_expected_position(data["short_table"], amount // 2)
@@ -1003,7 +1049,7 @@ def export_csv(request) -> HttpResponse:
 
     # Merge user uploaded portfolio, or blank dataframe to df_execute
     df_execute = pd.merge(df_execute, df_portfolio, on="Ticker", how="outer")
-    
+
     # Calculate "Execute Position"
     df_execute["Existing Position"] = (
         df_execute["Existing Position"].infer_objects(copy=False).fillna(0)
@@ -1017,10 +1063,10 @@ def export_csv(request) -> HttpResponse:
 
     # Format column: Execute Position
     df_execute["Execute Position"] = df_execute["Execute Position"].round(2)
-    
+
     # Extract columns: Ticker, Execute Position
     df_execute = df_execute[["Ticker", "Execute Position"]]
-    
+
     # Drop rows with "Execute Position" = 0
     df_execute = df_execute[df_execute["Execute Position"] != 0]
 
@@ -1071,6 +1117,8 @@ def export_csv(request) -> HttpResponse:
     return response
 
 
+@require_POST
+@login_required
 def get_expected_position(l_tables: list, amount: int) -> pd.DataFrame:
     """
     Convert frontend data to dataframe, and calculate expected position for the latest period.
@@ -1091,9 +1139,9 @@ def get_expected_position(l_tables: list, amount: int) -> pd.DataFrame:
         """Return true if string is the format of %b %Y."""
         pattern = r"^[A-Za-z]{3} \d{4}$"
         match = re.match(pattern, string)
-        
+
         return bool(match)
-    
+
     # Create columns list from l_tables[0][1]
     columns = []
     for col in l_tables[0][1]:
@@ -1151,3 +1199,85 @@ def get_expected_position(l_tables: list, amount: int) -> pd.DataFrame:
     df["Expected Position"] = df["Amount(USD)"] / df["Prev Close"]
 
     return df
+
+
+@require_POST
+@login_required
+def search_method(request):
+    """
+    Search data names in Income Statement, Balance Sheet and Cash Flow, by "search_text".
+    Return JsonResponse with a list of data name.
+    """
+    search_str = json.loads(request.body).get("search_text")
+    if search_str.strip() == "":
+        return JsonResponse({"result": []})
+
+    fields_income_statement = [
+        separate_words(field.name)
+        for field in IncomeStatement._meta.get_fields()
+        if field.concrete
+        and field.name
+        not in ("id", "stock", "FileDate", "StartDate", "EndDate", "FiscalPeriod")
+    ]
+    fields_balancesheet = [
+        separate_words(field.name)
+        for field in BalanceSheet._meta.get_fields()
+        if field.concrete
+        and field.name
+        not in ("id", "stock", "FileDate", "StartDate", "EndDate", "FiscalPeriod")
+    ]
+    fields_cashflow = [
+        separate_words(field.name)
+        for field in CashFlow._meta.get_fields()
+        if field.concrete
+        and field.name
+        not in ("id", "stock", "FileDate", "StartDate", "EndDate", "FiscalPeriod")
+    ]
+    all_fields = fields_income_statement + fields_balancesheet + fields_cashflow
+    results = [method for method in all_fields if search_str.lower() in method.lower()]
+
+    return JsonResponse({"result": list(set(sorted(results)))})
+
+
+@require_POST
+@login_required
+def update_stock_numbers(request):
+    """
+    Get number of stock by "market-cap", "sectors".
+    """
+    # Get params from frontend
+    data = json.loads(request.body)
+    selected_market_cap = data.get("market_cap")
+    selected_sectors = data.get("sectors")
+    if "All" in selected_sectors:
+        selected_sectors.remove("All")
+
+    # Get US stocks by market_cap and sectors
+    try:
+        stocks = get_us_stocks(selected_market_cap, selected_sectors)
+    except Exception as e:
+        logging.warning(
+            f"Error fetching US stocks for {selected_market_cap} and {selected_sectors}. ({e})"
+        )
+        return JsonResponse({"status": 404})
+
+    result = {}
+
+    # Update result by sector
+    for sector in sectors:
+        result[sector] = len(stocks[stocks["sector"] == sector])
+    result["All"] = sum(result.values())
+
+    # Update result by market cap
+    for mc in market_cap:
+        if "Mega" in mc:
+            result[mc] = len(stocks[stocks["market_cap"] >= market_cap[mc]])
+        else:
+            result[mc] = len(
+                stocks[
+                    (stocks["market_cap"] >= market_cap[mc][0])
+                    & (stocks["market_cap"] < market_cap[mc][-1])
+                ]
+            )
+
+    return JsonResponse({"result": result})

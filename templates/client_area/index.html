@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% load static %}
+
+<!-- Title -->
+{% block title %}Client Area{% endblock title %}
+
+<!-- Header -->
+{% block header %}
+<h1>Welcome to the Client Area</h1>
+<p>Manage your account, explore strategies, and stay connected.</p>
+{% endblock header %}
+
+<!-- Content -->
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2 sidebar bg-secondary-subtle">
+            <ul class="list-unstyled">
+                <li class="mb-3">
+                    <a href="{% url 'frontpage' %}" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-home"></i> Home
+                    </a>
+                </li>
+                <li class="mb-3">
+                    <a href="#" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-search"></i> Search
+                    </a>
+                </li>
+                <li class="mb-3">
+                    <a href="#" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-compass"></i> Explore
+                    </a>
+                </li>
+                <li class="mb-3">
+                    <a href="#" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-envelope"></i> Messages
+                    </a>
+                </li>
+                <li class="mb-3">
+                    <a href="#" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-bell"></i> Notifications
+                    </a>
+                </li>
+                <li class="mb-3">
+                    <a href="#" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-user"></i> Profile
+                    </a>
+                </li>
+                <li class="mb-3">
+                    <a href="{% url 'account_logout' %}" class="btn btn-outline-danger w-100">
+                        <i class="fas fa-sign-out-alt"></i> Log Out
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10 main-content">
+            <div class="content-wrapper">
+                <h2>Welcome, {{ user.username }}</h2>
+                <p>Here you can manage your account, explore strategies, and stay connected with the community.</p>
+                <div class="placeholder-content">
+                    <p>This is where your main content will go, such as posts, messages, or notifications.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

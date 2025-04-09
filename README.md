@@ -1,4 +1,4 @@
-## To install psycopg2 to connect to the postgres database
+## Install psycopg2 to connect to the postgres database
 > pip install psycopg2-binary
 
 ## Maintain the database, keep the financial data up to date

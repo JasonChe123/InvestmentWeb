@@ -1,5 +1,5 @@
 $(document).ready(function () {
-    // Elements
+    // DOM element
     const allCheckbox = $('#all-sectors-checkbox');
     const marketCapCheckbox = $('.market-cap-checkbox');
     const marketCapCheckLabel = $('.market-cap-checklabel');
@@ -127,7 +127,7 @@ $(document).ready(function () {
                 });
             },
             error: function (xhr, status, error) {
-                console.log(xhr.responseText);
+                console.log("message from server: ", xhr.responseText);
             }
         })
     }
@@ -179,7 +179,7 @@ $(document).ready(function () {
             dataTableheads[i].classList.add('border-primary');
         }
     }
-    
+
     // Format table: add left border to ticker columns (data rows)
     for (let j = 0; j < dataTableCells.length; j++) {
         if (dataTableCells[j].cellIndex % 3 === 0) {
@@ -203,7 +203,7 @@ $(document).ready(function () {
                 return;
             }
         }
-        
+
         // Ajax: search report data names
         const search_value = event.target.value;
         $.ajax({
@@ -423,4 +423,80 @@ $(document).ready(function () {
             }
         });
     })
+
+    // Message (from server) handling for AJAX responses
+    function showDynamicMessage(message, type = 'info') {
+        // Create messages container if it doesn't exist
+        let messagesContainer = document.querySelector('.messages');
+        if (!messagesContainer) {
+            messagesContainer = document.createElement('div');
+            messagesContainer.className = 'messages';
+            document.querySelector('main').prepend(messagesContainer);
+        }
+
+        // Create message element
+        const messageElement = document.createElement('div');
+        messageElement.className = `alert alert-sm alert-${type}`;
+        messageElement.textContent = message;
+
+        // Add to container
+        messagesContainer.appendChild(messageElement);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            messageElement.remove();
+            if (messagesContainer.children.length === 0) {
+                messagesContainer.remove();
+            }
+        }, 5000);
+    }
+
+    // Button click handler (My Strategy Button), send ajax request to update database
+    $('.my-strategy').click(function (e) {
+        // Get button values
+        let action = e.target.value.split(',')[0].trim();
+        let sector = e.target.value.split(',')[1].trim();
+
+        // Send AJAX request
+        $.ajax({
+            url: 'alter-my-strategy',
+            type: 'POST',
+            headers: {
+                'X-requested-with': 'XMLHttpRequest',
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            data: JSON.stringify({
+                "action": action,
+                "market_cap": scriptTag.attr("market_cap"),
+                "pos_hold": scriptTag.attr("pos_hold"),
+                "min_stock_price": scriptTag.attr("min_stock_price"),
+                "sorting_method": scriptTag.attr("sorting_method"),
+                "sector": sector,
+                "formula": scriptTag.attr("formula"),
+            }),
+            success: function (data) {
+                if (data.message) {
+                    showDynamicMessage(data.message, data.message_type || 'info');
+                    // Toggle button text, value and classes
+                    const button = $(e.target);
+                    if (action === 'add') {
+                        button.text('Delete')
+                            .val('delete,' + sector)
+                            .removeClass('btn-primary')
+                            .addClass('btn-danger');
+                    } else {
+                        button.text('Add')
+                            .val('add,' + sector)
+                            .removeClass('btn-danger')
+                            .addClass('btn-primary');
+                    }
+                }
+            },
+            error: function (xhr, status, error) {
+                let message = JSON.parse(xhr.responseText).message;
+                showDynamicMessage(message, 'danger');
+            }
+        });
+    });
 });

@@ -47,7 +47,7 @@
                                         <!-- Backtest years -->
                                         <div class="form-group row my-1">
                                             <label for="backtest_years" class="col-md-7 col-form-label">Backtest
-                                                Years</label>
+                                                Years (from Now)</label>
                                             <div class="col-md-5">
                                                 <select id="backtest_years" name="backtest_years" class="form-control">
                                                     {% for y in backtest_years %}
@@ -63,8 +63,9 @@
 
                                         <!-- Positions hold -->
                                         <div class="form-group row my-1">
-                                            <label for="pos_hold" class="col-md-7 col-form-label">Positions per
-                                                Sector</label>
+                                            <label for="pos_hold" class="col-md-7 col-form-label">
+                                                Positions Side per Sector
+                                            </label>
                                             <div class="col-md-5">
                                                 <select id="pos_hold" name="pos_hold" class="form-control">
                                                     {% for p in pos_hold %}
@@ -81,7 +82,7 @@
                                         <!-- Minimum stock price -->
                                         <div class="form-group row my-1">
                                             <label for="min_stock_price" class="col-md-7 col-form-label">Min Stock
-                                                Price</label>
+                                                Price (any day in the past 30 days)</label>
                                             <div class="col-md-5">
                                                 <select id="min_stock_price" name="min_stock_price"
                                                     class="form-control">

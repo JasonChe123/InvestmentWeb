@@ -28,6 +28,9 @@
                 {% if field.help_text %}
                 <small class="form-text text-muted">{{ field.help_text }}</small>
                 {% endif %}
+                {% if field.name == 'username' %}
+                <p id="username-feedback" class="invalid-feedback d-block" style="display: none;"></p>
+                {% endif %}
                 {% for error in field.errors %}
                 <div class="invalid-feedback d-block">
                     {{ error }}
@@ -37,7 +40,7 @@
             {% endfor %}
 
             {% if redirect_field_value %}
-            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}"/>
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
             {% endif %}
 
             <!-- Submit button -->
@@ -52,6 +55,37 @@
 {% block script %}
 {{ block.super }}
 <script>
-    console.log("signup script");
+    document.addEventListener('DOMContentLoaded', function () {
+        // Username validation with debounce
+        let usernameTimeout;
+        const feedback = $('#username-feedback');
+
+        $('input[name="username"]').on("keyup", function () {
+            clearTimeout(usernameTimeout);
+            usernameTimeout = setTimeout(() => {
+                const username = $(this).val();
+
+                $.ajax({
+                    url: "{% url 'account_username_validation' %}",
+                    data: {
+                        'username': username,
+                    },
+                    dataType: 'json',
+                    success: function (data) {
+                        console.log(data);
+                        if (data.username_exists) {
+                            console.log("show");
+                            feedback.text('This username is already taken.').show();
+                        } else {
+                            feedback.text('').hide();
+                        }
+                    },
+                    error: function(xhr, text, error) {
+                        feedback.text('Error validating username.').show();
+                    }
+                });
+            }, 200); // 200ms debounce delay
+        });
+    });
 </script>
 {% endblock script %}

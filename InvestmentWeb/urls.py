@@ -22,6 +22,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('frontpage.urls')),
     path('accounts/', include('allauth.urls')),
+    path('account_username_validation', include('account_username_validation.urls'),),
     path('client_area/', include('client_area.urls')),
     path('strategy_pool/', include('strategy_pool.urls')),
     path('long_short/', include('long_short_strategy.urls')),

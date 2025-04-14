@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # my apps
+    'account_username_validation.apps.AccountUsernameValidationConfig',
     "client_area.apps.ClientAreaConfig",
     "frontpage.apps.FrontpageConfig",
     "long_short_strategy.apps.LongShortStrategyConfig",
@@ -115,7 +116,9 @@ EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
 
 # Allauth
+ACCOUNT_USERNAME_REQUIRED = True
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+ACCOUNT_AUTHENTICATION_METHOD = "username_email"
 ACCOUNT_SIGNUP_REDIRECT_URL = "/"
 LOGIN_REDIRECT_URL = "/"

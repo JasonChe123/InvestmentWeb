@@ -13,58 +13,63 @@
 <!-- Content -->
 {% block content %}
 <div class="container-fluid">
-    <div class="row">
-        <!-- Sidebar -->
-        <div class="col-md-3 col-lg-2 sidebar bg-secondary-subtle">
-            <ul class="list-unstyled">
-                <li class="mb-3">
-                    <a href="{% url 'frontpage' %}" class="btn btn-outline-primary w-100">
-                        <i class="fas fa-home"></i> Home
-                    </a>
-                </li>
-                <li class="mb-3">
-                    <a href="#" class="btn btn-outline-primary w-100">
-                        <i class="fas fa-search"></i> Search
-                    </a>
-                </li>
-                <li class="mb-3">
-                    <a href="#" class="btn btn-outline-primary w-100">
-                        <i class="fas fa-compass"></i> Explore
-                    </a>
-                </li>
-                <li class="mb-3">
-                    <a href="#" class="btn btn-outline-primary w-100">
-                        <i class="fas fa-envelope"></i> Messages
-                    </a>
-                </li>
-                <li class="mb-3">
-                    <a href="#" class="btn btn-outline-primary w-100">
-                        <i class="fas fa-bell"></i> Notifications
-                    </a>
-                </li>
-                <li class="mb-3">
-                    <a href="#" class="btn btn-outline-primary w-100">
-                        <i class="fas fa-user"></i> Profile
-                    </a>
-                </li>
-                <li class="mb-3">
-                    <a href="{% url 'account_logout' %}" class="btn btn-outline-danger w-100">
-                        <i class="fas fa-sign-out-alt"></i> Log Out
-                    </a>
-                </li>
-            </ul>
+    <div class="row flex-nowrap">
+        <div class="w-25 bg-dark">
+            <!-- Sidebar -->
+            <div class="d-flex flex-column align-items-center align-items-sm-start px-3 pt-2 text-white" id="sidebar">
+                <ul class="nav nav-pills flex-column mb-sm-auto mb-0 align-items-center align-items-sm-start" id="menu">
+                    <li class="nav-item">
+                        <a href="{% url 'client_area' %}" class="nav-link align-middle px-0">
+                            <i class="fs-4 bi-speedometer2"></i> <span class="ms-1 d-none d-sm-inline">Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link align-middle px-0">
+                            <i class="fs-4 bi-bar-chart-line"></i> <span class="ms-1 d-none d-sm-inline">My
+                                Strategies</span>
+                        </a>
+                    </li>
+                    <hr>
+                    <div class="dropdown pb-4">
+                        <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle"
+                            id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}{% static 'images/default-profile-pic.png' %}{% endif %}"
+                                alt="Profile" width="30" height="30" class="rounded-circle">
+                            <span class="d-none d-sm-inline mx-2">{{ user.username }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser1">
+                            <!-- <li><a class="dropdown-item" href="#">New project...</a></li> -->
+                            <!-- <li><a class="dropdown-item" href="#">Settings</a></li> -->
+                            <li><a class="dropdown-item" href="{% url 'client_profile' %}">Profile</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item" href="{% url 'account_logout' %}">Sign out</a></li>
+                        </ul>
+                    </div>
+                </ul>
+            </div>
         </div>
 
-        <!-- Main Content -->
-        <div class="col-md-9 col-lg-10 main-content">
-            <div class="content-wrapper">
-                <h2>Welcome, {{ user.username }}</h2>
-                <p>Here you can manage your account, explore strategies, and stay connected with the community.</p>
-                <div class="placeholder-content">
-                    <p>This is where your main content will go, such as posts, messages, or notifications.</p>
-                </div>
-            </div>
+        <!-- Client area content -->
+        <div class="w-75">
+            {% block client_area_content %}
+            {% endblock client_area_content %}
         </div>
     </div>
 </div>
+
 {% endblock content %}
+
+{% block script %}
+{{ block.super }}
+<script>
+    $(document).ready(function () {
+        // Auto resize the sidebar to expand to the bottom
+        $("#sidebar").css("min-height", $(window).height() - $("header").height());
+        $(window).resize(function () {
+            $("#sidebar").css("min-height", $(window).height() - $("header").height());
+        });
+    })
+</script>
+{% endblock script %}

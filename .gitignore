@@ -22,8 +22,6 @@ django.log
 
 problem_solving.md
 
-settings.py
-
 .env
 .idea
 .venv

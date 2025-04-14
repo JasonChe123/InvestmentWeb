@@ -4,6 +4,13 @@
 {% load widget_tweaks %}
 
 {% block title %}{% trans "Sign In" %}{% endblock %}
+
+<!-- Header -->
+{% block header %}
+<h1>Sign In</h1>
+{% endblock header %}
+
+
 {% block authentication_content %}
 <!-- Login Page -->
 <h1 class="text-center mb-4">{% trans "Sign In" %}</h1>
@@ -22,6 +29,10 @@
 <!-- Login form -->
 <form class="login" method="POST" action="{% url 'account_login' %}">
     {% csrf_token %}
+
+    {% if form.errors %}
+    <p class="bg-warning text-dark px-2 py-1 rounded">Username or Password didn't match. Please try again.</p>
+    {% endif %}
 
     <!-- Customize fields -->
     {% for field in form %}
@@ -70,54 +81,4 @@
 <div class="d-flex justify-content-center">
     <h6>Don't have an account? <a href="{{ signup_url }}">sign up</a></h6>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-// Close popup after successful login
-document.addEventListener('DOMContentLoaded', function() {
-    console.log(window);
-    // Check if this is a popup window
-    if (window.isPopup) {
-        // Find the login form
-        const loginForm = document.querySelector('form.login');
-
-        if (loginForm) {
-            // Intercept form submission
-            loginForm.addEventListener('submit', function(e) {
-                // Convert to AJAX submission
-                e.preventDefault();
-
-                const formData = new FormData(loginForm);
-                
-                fetch(loginForm.action, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // // Notify parent window and close
-                        // window.opener.postMessage({
-                        //     type: 'loginSuccess',
-                        //     redirectUrl: data.redirect || '/'
-                        // }, '*');
-                        window.close();
-                    } else {
-                        // Handle errors normally
-                        // loginForm.submit();
-                    }
-                })
-                .catch(() => {
-                    // Fallback to normal submission
-                    // loginForm.submit();
-                });
-            });
-        }
-    }
-});
-</script>
 {% endblock %}

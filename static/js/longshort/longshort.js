@@ -127,7 +127,7 @@ $(document).ready(function () {
                 });
             },
             error: function (xhr, status, error) {
-                console.log("message from server: ", xhr.responseText);
+                console.log("Update stock number error.");
             }
         })
     }

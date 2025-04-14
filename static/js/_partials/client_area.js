@@ -1,6 +1,4 @@
 $(document).ready(function () {
-    console.log("client area js loaded.");
-
     // Sidebar toggle functionality
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('sidebar-toggle-btn');

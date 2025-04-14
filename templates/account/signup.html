@@ -3,6 +3,10 @@
 {% load widget_tweaks %}
 {% block title %}{% trans "Sign Up" %}{% endblock title %}
 
+{% block header %}
+<h1>{% trans "Sign Up" %}</h1>
+{% endblock header %}
+
 {% block content %}
 <!-- Sign Up Page -->
 <div class="container mt-5 card shadow p-3" style="max-width: 450px;">
@@ -44,3 +48,10 @@
     </div>
 </div>
 {% endblock content %}
+
+{% block script %}
+{{ block.super }}
+<script>
+    console.log("signup script");
+</script>
+{% endblock script %}

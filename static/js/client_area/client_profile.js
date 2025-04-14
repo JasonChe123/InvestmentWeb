@@ -18,28 +18,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Handle form submission
-    const editProfileForm = document.getElementById('edit-profile-form');
-    if (editProfileForm) {
-        editProfileForm.addEventListener('submit', function(e) {
-            e.preventDefault();
+    // const editProfileForm = document.getElementById('edit-profile-form');
+    // if (editProfileForm) {
+    //     editProfileForm.addEventListener('submit', function(e) {
+    //         e.preventDefault();
             
-            const formData = new FormData(this);
+    //         const formData = new FormData(this);
             
-            fetch(window.location.href, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                }
-            })
-            .then(response => {
-                if (response.redirected) {
-                    window.location.href = response.url;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-        });
-    }
+    //         fetch(window.location.href, {
+    //             method: 'POST',
+    //             body: formData,
+    //             headers: {
+    //                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    //             }
+    //         })
+    //         .then(response => {
+    //             if (response.redirected) {
+    //                 window.location.href = response.url;
+    //             }
+    //         })
+    //         .catch(error => {
+    //             console.error('Error:', error);
+    //         });
+    //     });
+    // }
 });

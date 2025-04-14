@@ -12,28 +12,36 @@
 <div class="container mt-5 card shadow p-3" style="max-width: 450px;">
     <div>
         <h1 class="text-center mb-4">{% trans "Sign Up" %}</h1>
-        <!-- Login form -->
+        <!-- Login Form -->
         <form class="login" method="POST" action="{% url 'account_signup' %}">
             {% csrf_token %}
 
-            <!-- Sign in -->
+            <!-- Sign In -->
             <div class="d-flex justify-content-center">
                 <h6>Already have an account? <a href="{% url 'account_login' %}">sign in</a></h6>
             </div>
-            <!-- Customize fields -->
+            <!-- Customize Fields -->
             {% for field in form %}
             <div class="form-floating mb-3">
+                
+                <!-- Label and Help Text -->
                 {{ field|add_class:"form-control" }}
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {% if field.help_text %}
                 <small class="form-text text-muted">{{ field.help_text }}</small>
                 {% endif %}
+
+                <!-- Username Validation -->
                 {% if field.name == 'username' %}
                 <p id="username-feedback" class="invalid-feedback d-block" style="display: none;"></p>
                 {% endif %}
+
+                <!-- Other Validation -->
                 {% for error in field.errors %}
+                {% if error != "A user with that username already exists." %}
                 <div class="invalid-feedback d-block">
                     {{ error }}
+                {% endif %}
                 </div>
                 {% endfor %}
             </div>
@@ -43,7 +51,7 @@
             <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
             {% endif %}
 
-            <!-- Submit button -->
+            <!-- Submit Button -->
             <button class="btn btn-primary w-100" type="submit">{% trans "Sign Up" %}</button>
         </form>
 
@@ -56,7 +64,7 @@
 {{ block.super }}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Username validation with debounce
+        // Username Validation with Debounce
         let usernameTimeout;
         const feedback = $('#username-feedback');
 
@@ -72,19 +80,19 @@
                     },
                     dataType: 'json',
                     success: function (data) {
-                        console.log(data);
                         if (data.username_exists) {
-                            console.log("show");
                             feedback.text('This username is already taken.').show();
+                            $("button", "form").prop("disabled", true);
                         } else {
                             feedback.text('').hide();
+                            $("button", "form").prop("disabled", false);
                         }
                     },
-                    error: function(xhr, text, error) {
+                    error: function (xhr, text, error) {
                         feedback.text('Error validating username.').show();
                     }
                 });
-            }, 200); // 200ms debounce delay
+            }, 100); // 100ms debounce delay
         });
     });
 </script>

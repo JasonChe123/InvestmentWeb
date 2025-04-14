@@ -5,16 +5,20 @@ from django.contrib import messages
 from .models import Profile
 from .forms import ProfileForm
 
+import pdb
+
 
 @login_required
 def home(request):
     return render(request, "client_area/index.html")
+
 
 @login_required
 def profile(request):
     profile, created = Profile.objects.get_or_create(user=request.user)
     
     if request.method == "POST":
+        pdb.set_trace()
         form = ProfileForm(request.POST, request.FILES, instance=profile)
         if form.is_valid():
             # Save profile with picture first
@@ -27,6 +31,7 @@ def profile(request):
             user.save()
             
             messages.success(request, 'Profile updated successfully!')
+            
             return redirect('client_profile')
         else:
             messages.error(request, 'Error updating profile. Please check the form.')

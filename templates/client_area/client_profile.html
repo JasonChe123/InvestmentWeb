@@ -13,8 +13,11 @@
                         <div class="col-md-4 text-center p-2">
                             <div>
                                 <label>
-                                <img src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}{% static 'images/default-profile-pic.png' %}{% endif %}"
-                                        alt="Profile Picture" class="profile-picture">
+                                    <img src="{% if user.profile.profile_picture %}
+                                                {{ user.profile.profile_picture.url }}
+                                                {% else %}
+                                                {% static 'images/default-profile-pic.png' %}
+                                                {% endif %}" alt="Profile Picture" class="profile-picture">
                                 </label>
                             </div>
                         </div>
@@ -86,9 +89,12 @@
                         <input type="file" id="profile-picture-input" name="profile_picture" accept="image/*"
                             class="d-none">
                         <label for="profile-picture-input" class="profile-picture-wrapper">
-                                <img id="profile-picture"
-                                src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}{% static 'images/default-profile-pic.png' %}{% endif %}"
-                                alt="Profile Picture" class="profile-picture" style="max-height: 300px">
+                            <img id="profile-picture" src="{% if user.profile.profile_picture %}
+                                        {{ user.profile.profile_picture.url }}
+                                        {% else %}
+                                        {% static 'images/default-profile-pic.png' %}
+                                        {% endif %}" alt="Profile Picture" class="profile-picture"
+                                style="max-height: 300px">
                             <div class="profile-picture-overlay">
                                 <i class="bi bi-camera-fill"></i>
                             </div>

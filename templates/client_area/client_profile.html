@@ -1,132 +1,56 @@
 {% extends 'client_area/index.html' %}
 {% load static %}
 
+{% block head %}
+<link rel="stylesheet" href="{% static 'css/profile_form.css' %}">
+{% endblock head %}
+
+{% block title %}
+Client Profile
+{% endblock title %}
+
 {% block client_area_content %}
-<div class="container-fluid">
-    <div class="row p-4">
-        <div>
-            <h2 class="mb-4">My Profile</h2>
-            <div class="card shadow">
-                <div class="card-body">
-                    <div class="row d-flex">
-                        <!-- Profile Picture Column -->
-                        <div class="col-md-4 text-center p-2">
-                            <div>
-                                <label>
-                                    <img src="{% if user.profile.profile_picture %}
-                                                {{ user.profile.profile_picture.url }}
-                                                {% else %}
-                                                {% static 'images/default-profile-pic.png' %}
-                                                {% endif %}" alt="Profile Picture" class="profile-picture">
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- User Info Column -->
-                        <div class="col-md-8">
-                            <form method="post" class="profile-form">
-                                {% csrf_token %}
-                                <!-- Name -->
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label">First Name</label>
-                                        <input type="text" class="form-control" value="{{ user.first_name }}" readonly>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Last Name</label>
-                                        <input type="text" class="form-control" value="{{ user.last_name }}" readonly>
-                                    </div>
-                                </div>
-
-                                <!-- Username -->
-                                <div class="mb-3">
-                                    <label class="form-label">Username</label>
-                                    <input type="text" class="form-control" value="{{ user.username }}" readonly>
-                                </div>
-
-                                <!-- Email -->
-                                <div class="mb-3">
-                                    <label class="form-label">Email</label>
-                                    <input type="email" class="form-control" value="{{ user.email }}" readonly>
-                                </div>
-
-                                <!-- Member since -->
-                                <div class="mb-3">
-                                    <label class="form-label">Member Since</label>
-                                    <input type="text" class="form-control" value="{{ user.date_joined|date:'F j, Y' }}"
-                                        readonly>
-                                </div>
-
-                                <!-- Button -->
-                                <button type="button" class="btn btn-primary" data-bs-toggle="modal"
-                                    data-bs-target="#editProfileModal">
-                                    Edit Profile
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+<div class="container-fluid p-4">
+    <h2 class="mb-4">My Profile</h2>
+    <div class="row d-flex p-4 border rounded-2 shadow">
+        <!-- Pfofile Picture -->
+        <div class="col-md-4 text-center p-2">
+            <div>
+                <label for="">
+                    <img style="max-width: 200px;" src="
+                        {% if user.profile.profile_picture %}
+                        {{ user.profile.profile_picture.url }}
+                        {% else %}
+                        {% static 'images/default_profile_pic.jpg' %}
+                        {% endif %}" alt="Profile Picture" class="profile-picture">
+                </label>
             </div>
         </div>
-    </div>
-</div>
 
-<!-- Edit Profile Modal -->
-<div class="modal fade" id="editProfileModal" tabindex="-1" aria-labelledby="editProfileModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editProfileModalLabel">Edit Profile</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-
-            <div class="modal-body">
-                <form method="post" id="edit-profile-form" enctype="multipart/form-data">
-                    {% csrf_token %}
-
-                    <!-- Profile picture -->
-                    <div class="mb-3 h-50 text-center">
-                        <input type="file" id="profile-picture-input" name="profile_picture" accept="image/*"
-                            class="d-none">
-                        <label for="profile-picture-input" class="profile-picture-wrapper">
-                            <img id="profile-picture" src="{% if user.profile.profile_picture %}
-                                        {{ user.profile.profile_picture.url }}
-                                        {% else %}
-                                        {% static 'images/default-profile-pic.png' %}
-                                        {% endif %}" alt="Profile Picture" class="profile-picture"
-                                style="max-height: 300px">
-                            <div class="profile-picture-overlay">
-                                <i class="bi bi-camera-fill"></i>
-                            </div>
-                        </label>
-                    </div>
-
-                    <!-- First name -->
+        <!-- Profile Form -->
+        <div class="col-md-8 p-4">
+            <form action="" method="post" disabled="true">
+                <div class="col-md-8">
+                    {{ form.as_p }}
+                    <!-- Email -->
                     <div class="mb-3">
-                        <label for="first_name" class="form-label">First Name</label>
-                        <input type="text" class="form-control" id="first_name" name="first_name"
-                            value="{{ user.first_name }}">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" value="{{ user.email }}" disabled>
                     </div>
-
-                    <!-- Last name -->
+                    <!-- Member since -->
                     <div class="mb-3">
-                        <label for="last_name" class="form-label">Last Name</label>
-                        <input type="text" class="form-control" id="last_name" name="last_name"
-                            value="{{ user.last_name }}">
+                        <label class="form-label">Member Since</label>
+                        <input type="text" class="form-control" value="{{ user.date_joined|date:'F j, Y' }}" disabled>
                     </div>
-                </form>
-            </div>
+                </div>
 
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" form="edit-profile-form" class="btn btn-primary">Save Changes</button>
-            </div>
+                <!-- Button -->
+                <button onclick="location.href='{% url 'update_client_profile' user.profile.id %}'" type="button"
+                    class="mt-3 btn btn-primary">
+                    Edit Profile
+                </button>
+            </form>
         </div>
     </div>
 </div>
 {% endblock client_area_content %}
-
-{% block script %}
-{{ block.super }}
-<script src="{% static 'js/client_area/client_profile.js' %}"></script>
-{% endblock script %}

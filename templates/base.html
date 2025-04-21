@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="Backtest strategies, export virtual trading orders, and access exclusive virtual portfolios.">
+        content="Backtesting strategies and get your trading signals.">
     <title>AlgoAnywhere - {% block title %}{% endblock title %}</title>
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
@@ -17,48 +17,48 @@
     {% block head %}{% endblock head %}
 </head>
 
-<body>
-    <header class="animate__animated animate__fadeInDown">
-        <div class="d-flex flex-wrap p-3 w-100">
-            <!-- Logo -->
-            <div class="logo-wrapper">
-                {% include 'partials/_logo.html' %}
-            </div>
-
-            <!-- Header Content -->
-            <div class="header-content"">
-                {% block header %}{% endblock header %}
-            </div>
-        </div>
-
-        <!-- Navigation Bar -->
-        <nav class=" navbar navbar-expand-lg p-2">
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav ms-auto">
-                        <!-- Home -->
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'frontpage' %}">Home</a>
-                        </li>
-                        <!-- Strategies -->
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'strategy_pool' %}">Strategies</a>
-                        </li>
-                        <!-- Pricing -->
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Pricing - Free Limited Time</a>
-                        </li>
-                        <!-- Client Area -->
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'client_area' %}">Client Area</a>
-                        </li>
-                    </ul>
+    <body>
+        <header class="{% if disable_animation %}no-animation{% else %}animate__animated animate__fadeInDown{% endif %}">
+            <div class="d-flex flex-wrap p-3 w-100">
+                <!-- Logo -->
+                <div class="logo-wrapper">
+                    {% include 'partials/_logo.html' %}
                 </div>
-                </nav>
-    </header>
+
+                <!-- Header Content -->
+                <div class="header-content"">
+                    {% block header %}{% endblock header %}
+                </div>
+            </div>
+
+            <!-- Navigation Bar -->
+            <nav class=" navbar navbar-expand-lg p-2">
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="navbarNav">
+                        <ul class="navbar-nav ms-auto">
+                            <!-- Home -->
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'frontpage' %}">Home</a>
+                            </li>
+                            <!-- Strategies -->
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'strategy_pool' %}">Strategies</a>
+                            </li>
+                            <!-- Pricing -->
+                            <li class="nav-item">
+                                <a class="nav-link" href="#">Pricing - Free Limited Time</a>
+                            </li>
+                            <!-- Client Area -->
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'client_area' %}">Client Area</a>
+                            </li>
+                        </ul>
+                    </div>
+                    </nav>
+        </header>
 
     <main>
         <!-- Message Block -->
@@ -70,9 +70,9 @@
         {% block content %}{% endblock content %}
     </main>
 
-    <footer class="animate__animated animate__fadeInUp">
+    <!-- <footer class="{% if disable_animation %}no-animation{% else %}animate__animated animate__fadeInUp{% endif %}">
         <p>&copy; 2025 AlgoAnywhere. All rights reserved.</p>
-    </footer>
+    </footer> -->
 
     <script src=" {% static 'js/bootstrap.bundle.min.js' %}"></script>
     <script src=" {% static 'js/base.js' %}"></script>

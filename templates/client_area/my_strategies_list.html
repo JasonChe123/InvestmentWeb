@@ -1,0 +1,28 @@
+{% extends 'client_area/index.html' %}
+{% load static %}
+
+{% block title %}
+My Strategies
+{% endblock title %}
+
+{% block client_area_content %}
+
+{% if object_list %}
+<div>
+    <h3>Strategy List</h3>
+    <ul>
+        {% for list in object_list %}
+        <li>
+            <!-- <div role="button" onclick="location.href='{{ list.get_absolute_url }}' "> -->
+            <div role="button" onclick="location.href='{% url "my_strategies" list.id %}' ">
+                {{ list.title }}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% else %}
+<h3 class="m-3">You have no strategies yet.</h3>
+{% endif %}
+
+{% endblock client_area_content%}

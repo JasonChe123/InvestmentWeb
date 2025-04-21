@@ -1,0 +1,36 @@
+{% extends 'client_area/index.html' %}
+{% load static %}
+
+{% block title %}
+My Strategies
+{% endblock title %}
+
+{% block client_area_content %}
+<h3>{{ strategies_list.title }}</h3>
+{% if object_list %}
+<section class="strategies-container animate__animated animate__fadeIn">
+    {% for object in object_list %}
+    <a class="strategy-box" href="#">
+        <h3>{{ object.name }}</h3>
+        <h5>{{ object.formula }} ({{ object.sector.title }})</h5>
+        <ul class="text-black">
+            <li>Market cap:
+                <ul>
+                    {% for mp in object.market_cap %}
+                    <li>{{ mp }}</li>
+                    {% endfor %}
+                </ul>
+            </li>
+            <li>Position side per sector: {{ object.position_side_per_sector }}</li>
+            <li>Min stock price: {{ object.min_stock_price }}</li>
+            <li>Sorting: {% if object.sort_ascending == True %}"Ascending"{% else %}"Descending"{% endif %}</li>
+        </ul>
+        <p>created at: {{ object.created_at|date }}</p>
+    </a>
+    {% endfor %}
+</section>
+{% else %}
+<h3 class="m-3">You have no strategies yet.</h3>
+{% endif %}
+
+{% endblock client_area_content%}

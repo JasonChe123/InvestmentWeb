@@ -1,5 +1,6 @@
 companyfacts/
 css/
+media/profile_pics/
 not_use/
 webfonts/
 
@@ -20,7 +21,7 @@ logo.html
 
 django.log
 
-problem_solving.md
+problem_solving_history.md
 
 .env
 .idea

@@ -6,7 +6,7 @@
 
 <!-- Header -->
 {% block header %}
-<h1>Welcome to the Client Area</h1>
+<h1>Client Area</h1>
 <p>Manage your account, explore strategies, and stay connected.</p>
 {% endblock header %}
 
@@ -15,40 +15,62 @@
 <div class="container-fluid">
     <div class="row flex-nowrap">
         <div class="w-25 bg-dark">
+
             <!-- Sidebar -->
             <div class="d-flex flex-column align-items-center align-items-sm-start px-3 pt-2 text-white" id="sidebar">
                 <ul class="nav nav-pills flex-column mb-sm-auto mb-0 align-items-center align-items-sm-start" id="menu">
+
+                    <!-- Dashboard -->
                     <li class="nav-item">
                         <a href="{% url 'client_area' %}" class="nav-link align-middle px-0">
-                            <i class="fs-4 bi-speedometer2"></i> <span class="ms-1 d-none d-sm-inline">Dashboard</span>
+                            <i class="fs-4 bi-speedometer2"></i>
+                            <span class="ms-1 d-none d-sm-inline">Dashboard</span>
                         </a>
                     </li>
+
+                    <!-- My Strategies -->
                     <li class="nav-item">
-                        <a href="#" class="nav-link align-middle px-0">
-                            <i class="fs-4 bi-bar-chart-line"></i> <span class="ms-1 d-none d-sm-inline">My
-                                Strategies</span>
+                        <a href="{% url 'strategies_list' %}" class="nav-link align-middle px-0">
+                            <i class="fs-4 bi-bar-chart-line"></i>
+                            <span class="ms-1 d-none d-sm-inline">My Strategies</span>
                         </a>
                     </li>
                     <hr>
+
+                    <!-- Settings -->
                     <div class="dropdown pb-4">
+                        <!-- Thumbnail Photo -->
                         <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle"
                             id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
                             <img src="{% if user.profile.profile_picture %}
                                         {{ user.profile.profile_picture.url }}
                                         {% else %}
                                         {% static 'images/default-profile-pic.png' %}
-                                        {% endif %}"
-                                alt="Profile" width="30" height="30" class="rounded-circle">
+                                        {% endif %}" alt="Profile" width="30" height="30" class="rounded-circle">
                             <span class="d-none d-sm-inline mx-2">{{ user.username }}</span>
                         </a>
+
+                        <!-- Dropdown Menu -->
                         <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser1">
-                            <!-- <li><a class="dropdown-item" href="#">New project...</a></li> -->
-                            <!-- <li><a class="dropdown-item" href="#">Settings</a></li> -->
-                            <li><a class="dropdown-item" href="{% url 'client_profile' %}">Profile</a></li>
+                            <!-- Profile -->
+                            <li>
+                                <a class="dropdown-item" href="{% url 'client_profile' %}">
+                                    <i class="fs-5 bi bi-person text-primary"></i>
+                                    <span class="ms-1 d-none d-sm-inline">Profile</span>
+                                </a>
+                            </li>
+                            
                             <li>
                                 <hr class="dropdown-divider">
                             </li>
-                            <li><a class="dropdown-item" href="{% url 'account_logout' %}">Sign out</a></li>
+                            
+                            <!-- Logout -->
+                            <li>
+                                <a class="dropdown-item" href="{% url 'account_logout' %}">
+                                    <i class="fs-5 bi bi-box-arrow-right text-primary"></i>
+                                    <span class="ms-1 d-none d-sm-inline">Sign Out</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
                 </ul>
@@ -62,7 +84,6 @@
         </div>
     </div>
 </div>
-
 {% endblock content %}
 
 {% block script %}

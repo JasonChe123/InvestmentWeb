@@ -27,7 +27,7 @@ import pandas as pd
 import pdb
 import re
 from typing import Tuple
-from .models import MyStrategy
+from .models import LongShortEquity
 
 
 # todo:
@@ -237,7 +237,7 @@ class BackTestView(View):
                         i["mdd"] = mdd
                         i["rtr"] = rtr
 
-        # Get a list of sectors from MyStrategy
+        # Get a list of sectors from LongShortEquity
         my_strategy = get_my_strategy(
             request.user,
             market_cap,
@@ -552,7 +552,7 @@ def get_my_strategy(
     formula: str,
 ) -> set:
     """Return a set of sectors which matches the criteria'"""
-    res = MyStrategy.objects.filter(
+    res = LongShortEquity.objects.filter(
         user=user,
         market_cap=market_cap,
         position_side_per_sector=pos_side_per_sector,
@@ -925,7 +925,7 @@ def get_risk_to_return_ratio(mdd: float, series: pd.Series) -> float:
 @require_POST
 @login_required
 def alter_my_strategy(request):
-    """Add/ Delete MyStrategy from the database."""
+    """Add/ Delete LongShortEquity from the database."""
     # Get request content
     res_content = json.loads(request.body)
 
@@ -934,14 +934,15 @@ def alter_my_strategy(request):
     market_cap_list = json.loads(market_cap)
 
     try:
+        # Create params for database operation and JsonResponse
         if res_content["action"] == "add":
-            db_operation = MyStrategy.objects.update_or_create
+            db_operation = LongShortEquity.objects.update_or_create
             status = "Created"
             status_code = 201
             message = f"Strategy < {res_content['sector']} > Added"
             message_type = "success"
         elif res_content["action"] == "delete":
-            db_operation = MyStrategy.objects.filter
+            db_operation = LongShortEquity.objects.filter
             status = "OK"
             status_code = 200
             message = f"Strategy < {res_content['sector']} > Deleted"
@@ -952,6 +953,7 @@ def alter_my_strategy(request):
         # Database operation
         res = db_operation(
             user=request.user,
+            name="LongShort Equity",
             market_cap=market_cap_list,
             position_side_per_sector=int(res_content["pos_hold"]),
             min_stock_price=int(res_content["min_stock_price"]),

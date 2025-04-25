@@ -9,7 +9,7 @@ def home(request):
             "link": "longshort-backtest",
             "coming_soon": False,
         },
-        # todo: Coming soon
+        # todo: Strategies coming soon
         # {
         #     "name": "Momentum Strategy",
         #     "description": "A strategy that buys assets with strong recent performance and sells those with weak performance.",

@@ -1,0 +1,52 @@
+{% extends 'client_area/index.html' %}
+{% load static %}
+
+{% block title %}
+My Strategies
+{% endblock title %}
+
+{% block client_area_content %}
+<div class="container-fluid p-4">
+
+    {% if object_list %}
+    <div class="list-group">
+
+        {% for list in object_list %}
+        <div class="list-group-item list-group-item-action" aria-current="true">
+            
+            <!-- Title -->
+            <div class="d-flex w-100 justify-content-between align-items-center">
+                <h5 class="mb-1">{{ list.title }}</h5>
+                <small>{{ list.created_on }}</small>
+            </div>
+
+            <!-- Description -->
+            <div class="d-flex w-100 justify-content-between align-items-center">
+                <p class="mb-1">{{ list.description }}</p>
+                <span class="badge bg-primary rounded-pill">{{ list.longshort_equity.count }}</span>
+            </div>
+
+            <!-- Edit/ Delete/ View Buttons -->
+            <button class="btn btn-sm btn-secondary"
+                onclick="location.href='{% url 'strategies_list_update' list.id %}'">
+                <i class="bi-pen me-2"></i>Edit</button>
+            <button class="btn btn-sm btn-danger"
+                onclick="location.href='{% url 'strategies_list_delete' list.id %}'">
+                <i class="bi-trash3 me-2"></i>Delete</button>
+            <button onclick="location.href='{% url 'my_strategies' list.id %}'"
+                class="btn w-100 h-100 position-absolute z-n1" style="left: 0; top: 0;"></button>
+        </div>
+        {% endfor %}
+
+    </div>
+    {% else %}
+    <h3 class=" m-3">You have no strategies list yet.</h3>
+    {% endif %}
+
+    <!-- Add Button -->
+    <div role="button" class="btn btn-primary mt-3" onclick="location.href='{% url 'strategies_list_create' %}'">
+        <i class="bi-plus-circle-fill me-2"></i>
+        <span>Add</span>
+    </div>
+</div>
+{% endblock client_area_content%}

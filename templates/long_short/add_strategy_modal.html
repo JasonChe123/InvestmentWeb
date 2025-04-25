@@ -1,0 +1,78 @@
+<!-- Modal to add strategy to strategies list -->
+<div class="modal fade" id="add-strategy-modal" tabindex="-1" role="dialog" aria-labelledby="message-modal-label"
+    aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+
+            <!-- Header -->
+            <div class="modal-header">
+                <h5 class="modal-title" id="message-modal-label">Select Strategies List</h5>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-body" id="message-modal-body">
+                {% if strategies_list %}
+                {% for list in strategies_list %}
+                <!-- Checkboxes (Strategies List) -->
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+                    <label class="form-check-label" for="flexCheckDefault">
+                        {{ list.title }} - {{ list.created_on }}
+                    </label>
+                </div>
+                {% endfor %}
+                <!-- Button (Add to Strategies List) -->
+                <button class="btn btn-primary"><i class="bi-plus-circle-fill me-2"></i>Add</button>
+                {% else %}
+                <p>You don't have strategies list yet.</p>
+                <!-- Button (Create Strategies List) -->
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add-strategy-list-modal">
+                    Create Strategies List
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal to create strategies list -->
+<div class="modal fade" id="add-strategy-list-modal" tabindex="-1" role="dialog" aria-labelledby="message-modal-label"
+    aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+
+            <!-- Header -->
+            <div class="modal-header">
+                <h5 class="modal-title" id="message-modal-label">Add New Strategies List</h5>
+            </div>
+
+            <!-- Body -->
+            <!-- to be continue -->
+            <div class="modal-body" id="message-modal-body">
+                <form class="p-2" method="post" action="{% url 'add-strategies-list' %}" id="form-add-strategies-list">
+                    {% csrf_token %}
+                    
+                    <!-- Error message from server -->
+                    <small id="error-message-create-strategies-list" class="text-danger"></small>
+                    
+                    <!-- Input: List Name -->
+                    <div class="mb-3">
+                        <label for="list-name" class="form-label">List Name</label>
+                        <input type="text" name="list-name" id="list-name" class="form-control"
+                            placeholder="Enter strategy list name (required)" required>
+                    </div>
+
+                    <!-- Input: Description -->
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description (optional)</label>
+                        <input type="text" name="description" id="description" class="form-control"
+                            placeholder="Description">
+                    </div>
+
+                    <!-- Submit Button -->
+                    <input type="submit" value="Create List" class="btn btn-primary my-3">
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

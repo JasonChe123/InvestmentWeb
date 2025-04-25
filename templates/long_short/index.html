@@ -20,6 +20,9 @@
 <!-- Main content -->
 <div class="container-fluid mb-5 p-3 long_short_content">
     <div>
+        <!-- Modal (add strategies) -->
+        {% include 'long_short/add_strategy_modal.html' %}
+
         <!-- Modal (export basket trader) -->
         {% include 'long_short/export_basket_trader_modal.html' %}
 
@@ -83,13 +86,16 @@
                             <td class="summary">{{ d.longshort_annualized }}%</td>
                             <td class="summary">{{ d.mdd }}%</td>
                             <td class="summary">{{ d.rtr }}</td>
-                            <td class="summary text-center">
+                            <td class="summary p-1 text-center">
                                 {% if d.sector in my_strategy %}
-                                <button class="btn btn-danger my-strategy" value="delete,{{ d.sector|slugify }}">
+                                <button class="btn btn-outline-danger my-strategy m-0 w-100 h-100"
+                                    value="delete,{{ d.sector|slugify }}">
                                     Delete
                                 </button>
                                 {% else %}
-                                <button class="btn btn-primary my-strategy" value="add,{{ d.sector|slugify }}">
+                                <button class="btn btn-outline-primary my-strategy m-0 w-100 h-100"
+                                    value="add,{{ d.sector|slugify }}" data-bs-toggle="modal"
+                                    data-bs-target="#add-strategy-modal">
                                     Add
                                 </button>
                                 {% endif %}
@@ -169,7 +175,8 @@
                                     <!-- Top stocks -->
                                     <p>
                                         Top {{ selected_pos_hold }} Stocks ( Total Performance
-                                        <b class="{% if d.long_total < 0 %}text-danger{% endif %}">{{ d.long_total }}</b> )
+                                        <b class="{% if d.long_total < 0 %}text-danger{% endif %}">
+                                            {{ d.long_total }}</b> )
                                     </p>
                                     <table class="table table-striped border border-primary table-top"
                                         style="table-layout: fixed;">
@@ -214,7 +221,8 @@
                                     <!-- Bottom stocks -->
                                     <p>
                                         Bottom {{ selected_pos_hold }} Stocks ( Total Performance
-                                        <b class="{% if d.short_total < 0 %}text-danger{% endif %}">{{ d.short_total }}</b>)
+                                        <b class="{% if d.short_total < 0 %}text-danger{% endif %}">
+                                            {{ d.short_total }}</b> )
                                     </p>
 
                                     <table class="table table-striped border border-primary table-bottom"
@@ -270,18 +278,17 @@
 
 <!-- Script -->
 {% block script %}
-<script src="{% static 'js/longshort/longshort.js' %}" 
-    id="longshort-js" 
-    csrf_token="{{ csrf_token }}"
-    formula="{{ selected_method }}"
-    market_cap="{{ selected_market_cap }}" 
-    min_stock_price="{{ selected_min_stock_price }}"
-    pos_hold="{{ selected_pos_hold }}" 
-    result="{{ result }}"
+{{ block.super }}
+<script src="{% static 'js/longshort/longshort.js' %}" id="longshort-js" csrf_token="{{ csrf_token }}"
+    formula="{{ selected_method }}" market_cap="{{ selected_market_cap }}"
+    min_stock_price="{{ selected_min_stock_price }}" pos_hold="{{ selected_pos_hold }}" result="{{ result }}"
     sorting_method="{{ selected_sorting_method }}">
-</script>
+    </script>
+
 {% if result %}
 <script src="{% static 'js/longshort/chart.js' %}" id="longshort-chart-js" chartData="{{ chart_data }}"
-    selectedMethod="{{ selected_method }}"></script>
+    selectedMethod="{{ selected_method }}">
+    </script>
 {% endif %}
+
 {% endblock script %}

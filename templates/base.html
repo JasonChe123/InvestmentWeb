@@ -1,4 +1,5 @@
 {% load static %}
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -63,13 +64,14 @@
     <main>
         <!-- Message Block -->
         <div class="d-flex mx-1 animate__animated animate__slowest animate__fadeInfadeOut"
-            style="position: fixed; z-index: 999; right: 0;">
+            style="position: fixed; z-index: 999; right: 0;" id="messages-container">
             {% include 'partials/_messages.html' %}
-        </div> 
+        </div>
         <!-- Main Content -->
         {% block content %}{% endblock content %}
     </main>
 
+    <!-- todo: copyright to be added -->
     <!-- <footer class="{% if disable_animation %}no-animation{% else %}animate__animated animate__fadeInUp{% endif %}">
         <p>&copy; 2025 AlgoAnywhere. All rights reserved.</p>
     </footer> -->

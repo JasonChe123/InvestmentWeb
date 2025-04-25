@@ -1,7 +1,8 @@
 from django import forms
-from .models import Profile
 from django.core.exceptions import ValidationError
+from long_short_strategy.models import LongShortEquity
 import os
+from .models import Profile, StrategiesList
 
 
 class ProfileForm(forms.ModelForm):
@@ -23,7 +24,7 @@ class ProfileForm(forms.ModelForm):
         }
 
     def clean_profile_picture(self):
-        # todo: prompt warning messages instead of raising error
+        # todo: Prompt warning messages instead of raising error
         picture = self.cleaned_data.get("profile_picture", False)
 
         if picture:
@@ -41,3 +42,36 @@ class ProfileForm(forms.ModelForm):
                 )
 
         return picture
+
+
+class StrategiesListForm(forms.ModelForm):
+
+    class Meta:
+        model = StrategiesList
+        fields = [
+            "title",
+            "description",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["title"].widget.attrs = {"class": "form-control"}
+        self.fields["description"].widget.attrs = {
+            "class": "form-control",
+            "style": "min-height: 100px;",
+        }
+
+
+class LongShortEquityForm(forms.ModelForm):
+    
+    class Meta:
+        model = LongShortEquity
+        fields = [
+            "name",
+            "description"
+        ]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields:
+            field.widget.attrs = {"class": "form-control"}

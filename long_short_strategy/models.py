@@ -15,7 +15,7 @@ class LongShortEquity(models.Model):
         on_delete=models.CASCADE,
         related_name="longshort_equity",
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_on = models.DateField(auto_now_add=True)
     name = models.CharField(max_length=100, null=False, blank=False)
     description = models.TextField(null=True, blank=True)
 
@@ -38,10 +38,10 @@ class LongShortEquity(models.Model):
         return reverse("my_strategies", args=[self.id])
 
     def __str__(self):
-        return f"< {self.user.username} > {self.strategies_list.title} - {self.name}"
+        return f"{self.name} - {self.strategies_list}"
 
     class Meta:
-        ordering = ["name", "-created_at"]
+        ordering = ["name", "-created_on"]
         unique_together = [
             [
                 "user",

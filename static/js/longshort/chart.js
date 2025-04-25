@@ -112,6 +112,7 @@ function main() {
 
     // Detect current theme
     function isDarkTheme() {
+        localStorage.setItem('theme', 'light'); // todo: always set to 'light'
         return localStorage.getItem('theme') === 'dark';
     }
 

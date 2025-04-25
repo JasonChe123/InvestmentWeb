@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.template.context_processors import csrf
 from django.utils.decorators import method_decorator
 from django.views import View
@@ -24,13 +24,13 @@ from manage_database.models import (
 )
 import numpy as np
 import pandas as pd
-import pdb
 import re
 from typing import Tuple
 from .models import LongShortEquity
+from client_area.models import StrategiesList
 
 
-# todo:
+# todo: Change order type and ignore order amount under $100
 # 1. Order: Type: REL, Price 5% from previous close, allow outside RTH, Aux. Price 0.01, round qty to nearest decimal if possible
 # 2. Ignore any order if its amount is less $100
 
@@ -953,6 +953,7 @@ def alter_my_strategy(request):
         # Database operation
         res = db_operation(
             user=request.user,
+            # strategies_list="",
             name="LongShort Equity",
             market_cap=market_cap_list,
             position_side_per_sector=int(res_content["pos_hold"]),
@@ -1283,3 +1284,59 @@ def update_stock_numbers(request):
             )
 
     return JsonResponse({"result": result})
+
+
+@require_POST
+@login_required
+def add_strategies_list(request):
+    """
+    To add a strategies_list from model StrategiesList. Return
+    """
+    data = json.loads(request.body)
+    # [{'name': name, 'value': value}, ...]
+
+    # Get list name and description
+    list_name = ""
+    description = ""
+    for input_ in data:
+        if input_["name"] == "list-name":
+            list_name = input_["value"]
+            continue
+
+        if input_["name"] == "description":
+            description = input_["value"]
+
+    # Check existence
+    res = StrategiesList.objects.filter(user=request.user, title=list_name).exists()
+    if res:
+        return JsonResponse(
+            {
+                "message": f"The Strategies List '{list_name}' already exists.",
+                "message_type": "error",
+                "status": "bad request",
+            },
+            status=400,
+        )
+    else:
+        try:
+            StrategiesList.objects.create(
+                user=request.user, title=list_name, description=description
+            )
+            return JsonResponse(
+                {
+                    "message": f"Strategies List '{list_name}' added successfully.",
+                    "message_type": "success",
+                    "status": "ok",
+                },
+                status=200,
+            )
+        except Exception as e:
+            logging.error(f"Error creating StrategiesList: {e}")
+            return JsonResponse(
+                {
+                    "message": "Error creating strategies list, try again later.",
+                    "message_type": "error",
+                    "status": "internal server error",
+                },
+                status=500,
+            )

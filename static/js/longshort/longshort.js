@@ -133,6 +133,7 @@ $(document).ready(function () {
     }
 
     // Initialize stock number for market cap and sectors
+    console.log("Initialize stock number")
     updateStockNum();
 
     // 'All' checkbox event
@@ -391,7 +392,7 @@ $(document).ready(function () {
         loadingModal.show();
         $.ajax({
             url: 'export-csv',
-            method: 'POST',
+            type: 'POST',
             headers: {
                 'X-CSRFToken': csrfToken,
             },
@@ -426,33 +427,47 @@ $(document).ready(function () {
 
     // Message (from server) handling for AJAX responses
     function showDynamicMessage(message, type = 'info') {
-        // Create messages container if it doesn't exist
-        let messagesContainer = document.querySelector('.messages');
-        if (!messagesContainer) {
-            messagesContainer = document.createElement('div');
-            messagesContainer.className = 'messages';
-            document.querySelector('main').prepend(messagesContainer);
-        }
+        const messagesContainer = document.getElementById('messages-container');
 
         // Create message element
         const messageElement = document.createElement('div');
-        messageElement.className = `alert alert-sm alert-${type}`;
+        messageElement.className = `alert alert-sm alert-${type} mx-0 my-1 px-3 py-1`;
         messageElement.textContent = message;
-
-        // Add to container
         messagesContainer.appendChild(messageElement);
-
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            messageElement.remove();
-            if (messagesContainer.children.length === 0) {
-                messagesContainer.remove();
-            }
-        }, 5000);
     }
 
+    // Add strategies list
+    $('#form-add-strategies-list').on('submit', function (e) {
+        e.preventDefault();
+        $.ajax({
+            url: e.target.action,
+            type: e.target.method,
+            headers: {
+                'X-requested-with': 'XMLHttpRequest',
+                'Content-Type': 'application/json',
+                'X-CSRFToken': $(this).find("[name=csrfmiddlewaretoken]").val(),
+            },
+            data: JSON.stringify($(this).serializeArray()),
+            success: function (data) {
+                if (data.status === "ok") {
+                    showDynamicMessage(data.message, 'success');
+                    // console.log("message from server: ", data.message);
+                }
+                $('#error-message-create-strategies-list').text("");
+                $("#add-strategy-list-modal").modal("hide");
+            },
+            error: function (xhr, status, error) {
+                $('#error-message-create-strategies-list').text(
+                    JSON.parse(xhr.responseText).message
+                );
+            }
+        });
+    });
+
     // Button click handler (My Strategy Button), send ajax request to update database
-    $('.my-strategy').click(function (e) {
+    // todo: to be continue
+    $('.my-strategy_xxx').click(function (e) {
+        // $('.my-strategy').click(function (e) {
         // Get button values
         let action = e.target.value.split(',')[0].trim();
         let sector = e.target.value.split(',')[1].trim();

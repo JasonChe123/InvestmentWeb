@@ -1,0 +1,23 @@
+{% extends "client_area/index.html" %}
+{% load static %}
+
+
+{% block title %}
+Delete Strategies List
+{% endblock title %}
+
+{% block client_area_content %}
+<div class="container-fluid p-4">
+    <h2 class="mb-4">Delete Strategies List</h2>
+    <p>Are you sure you want to delete the strategies list: <b>{{ object.title }}</b>?</p>
+
+    <!-- Strategies List Form -->
+    <form method="post">
+        {% csrf_token %}
+        
+        <input method="post" type="submit" value="Yes, delete." class="btn btn-danger">
+        <input method="" type="button" value="Cancel" class="btn btn-secondary"
+            onclick="location.href='{% url 'strategies_list' %}'">
+    </form>
+</div>
+{% endblock client_area_content %}

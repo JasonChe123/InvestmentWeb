@@ -1,0 +1,59 @@
+{% extends 'client_area/index.html' %}
+{% load static %}
+
+{% block title %}
+{{ title }}
+{% endblock title %}
+
+{% block client_area_content %}
+<div class="container-fluid p-4">
+    {% if object_list %}
+    <h3>{{ strategies_list.title }}</h3>
+    <section class="strategies-container animate__animated animate__fadeIn">
+        {% for object in object_list %}
+        <a href="#" class="strategy-box row justify-content-center">
+            <h3>{{ object.name }}</h3>
+            <h5>{{ object.description }}</h5>
+            <div class="mt-2">
+                <table class="table table-sm table-borderless">
+                    <tbody>
+                        {% for mc in object.market_cap %}
+                        <tr>
+                            <td>{% if forloop.first %}Market Cap{% endif %}</td>
+                            <td>{{ mc }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr>
+                            <td>Position Side</td>
+                            <td>{{ object.position_side_per_sector }}</td>
+                        </tr>
+                        <tr>
+                            <td>Min Stock Price</td>
+                            <td>{{ object.min_stock_price }}</td>
+                        </tr>
+                        <tr>
+                            <td>Sector</td>
+                            <td>{{ object.sector }}</td>
+                        </tr>
+                        <tr>
+                            <td>Formula</td>
+                            <td>{{ object.formula }}</td>
+                        </tr>
+                        <tr>
+                            <td>Sorting</td>
+                            <td>{% if object.sort_ascending%}Ascending{% else %}Descending{% endif %}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p>Created on: {{ object.created_on }}</p>
+        </a>
+        {% endfor %}
+    </section>
+    {% else %}
+    <h3>You have no strategies yet</h3>
+    <button onclick="location.href='{% url 'strategy_pool' %}'" class="btn btn-primary">Explore Strategies</button>
+    <button onclick="location.href='{% url 'strategies_list' %}'" class="btn btn-secondary"></i>Back</button>
+    {% endif %}
+</div>
+{% endblock client_area_content%}

@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from long_short_strategy.models import LongShortEquity
 import os
 from .models import Profile, StrategiesList
@@ -21,10 +22,14 @@ class ProfileForm(forms.ModelForm):
             "class": "form-control",
             "id": "profile-picture-input",
             "hidden": True,
+            "accept": ".jpeg,.jpg,.png",
         }
+    
+    def clean(self):
+        # todo: validate file type
+        import pdb; pdb.set_trace()
 
     def clean_profile_picture(self):
-        # todo: Prompt warning messages instead of raising error
         picture = self.cleaned_data.get("profile_picture", False)
 
         if picture:
@@ -63,14 +68,11 @@ class StrategiesListForm(forms.ModelForm):
 
 
 class LongShortEquityForm(forms.ModelForm):
-    
+
     class Meta:
         model = LongShortEquity
-        fields = [
-            "name",
-            "description"
-        ]
-    
+        fields = ["name", "description"]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields:

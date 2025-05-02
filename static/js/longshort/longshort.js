@@ -1,42 +1,31 @@
 $(document).ready(function () {
-    // DOM element
-    const allCheckbox = $('#all-sectors-checkbox');
-    const marketCapCheckbox = $('.market-cap-checkbox');
-    const marketCapCheckLabel = $('.market-cap-checklabel');
+    // Useful DOM Element
     const sectorCheckbox = $('.sector-checkbox');
-    const sectorCheckLabel = $('.sector-checklabel');
-    const startButton = $('#start-button');
     const amountInput = $('#input-amount');
     const fileInput = $('#file-input')
     const exportButton = $('#export-button');
-    const basketTraderModal = new bootstrap.Modal($('#basket-trader-modal'));
-    const messageModal = new bootstrap.Modal($('#message-modal'));
-    const messageModalBody = $('#message-modal-body');
-    const loadingModal = new bootstrap.Modal($('#loading-modal'));
     const searchField = $('#search-field');
     const searchResult = $('#method-dropdown-menu');
     const selectedMethod = $('#selected-method');
     const selectedMethodInput = $('#selected-method-input');
     const tables = $('table');
     const cells = tables.find('td');
-
-    // CSRF token
-    const scriptTag = $('#longshort-js');
-    const csrfToken = scriptTag.attr("csrf_token");
-
-    // For collapse/ expand the backtest parameters
-    const result = scriptTag.attr("result");
+    const basketTraderModal = new bootstrap.Modal($('#basket-trader-modal'));
+    const messageModal = new bootstrap.Modal($('#message-modal'));
+    const loadingModal = new bootstrap.Modal($('#loading-modal'));
+    const csrfToken = $("meta[name='csrf-token']").attr('content');
+    const result = $('#longshort-js').attr('result');
 
     function extractTableData(table) {
-        /* Return data from table. */
+        // Return data from given table
         const rows = table.rows;
         const data = [];
 
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
+        for (let r = 0; r < rows.length; r++) {
+            const row = rows[r];
             const rowData = [];
-            for (let j = 0; j < row.cells.length; j++) {
-                rowData.push(row.cells[j].textContent);
+            for (let c = 0; c < row.cells.length; c++) {
+                rowData.push(row.cells[c].textContent);
             }
             data.push(rowData);
         }
@@ -85,7 +74,7 @@ $(document).ready(function () {
         // Get selected market cap and sectors
         let marketCap = [];
         let sectors = [];
-        marketCapCheckbox.each(function () {
+        $('.market-cap-checkbox').each(function () {
             if (this.checked) marketCap.push(this.value);
         });
         sectorCheckbox.each(function () {
@@ -94,7 +83,7 @@ $(document).ready(function () {
 
         // Request update stock numbers
         $.ajax({
-            url: 'update-stock-numbers',
+            url: "update-stock-numbers",
             type: 'POST',
             headers: {
                 'X-requested-with': 'XMLHttpRequest',
@@ -107,7 +96,7 @@ $(document).ready(function () {
             }),
             success: function (data) {
                 // Update sectors stock numbers
-                sectorCheckLabel.each(function () {
+                $('.sector-checklabel').each(function () {
                     let attr = this.getAttribute('for');
                     if (attr === 'all-sectors-checkbox') {
                         this.innerText = `All (${data.result['All']})`;
@@ -117,7 +106,7 @@ $(document).ready(function () {
                 });
 
                 // Update market cap stock numbers
-                marketCapCheckLabel.each(function () {
+                $('.market-cap-checklabel').each(function () {
                     let attr = this.getAttribute('for');
                     for (let key in data.result) {
                         if (key.includes(attr)) {
@@ -129,33 +118,26 @@ $(document).ready(function () {
             error: function (xhr, status, error) {
                 console.log("Update stock number error.");
             }
-        })
+        });
     }
 
     // Initialize stock number for market cap and sectors
-    console.log("Initialize stock number")
     updateStockNum();
 
     // 'All' checkbox event
-    allCheckbox.change(function () {
+    $('#all-sectors-checkbox').change(function () {
         sectorCheckbox.prop('checked', this.checked);
     });
 
     // 'Sector' checkbox event
     sectorCheckbox.change(function () {
         const allChecked = sectorCheckbox.length === sectorCheckbox.filter(':checked').length;
-        allCheckbox.prop('checked', allChecked);
+        $('#all-sectors-checkbox').prop('checked', allChecked);
         updateStockNum();
     });
 
-    // Amount input event
-    amountInput.change(validateExportButton);
-
-    // File input event
-    fileInput.change(validateExportButton);
-
     // Start button (show loading modal)
-    startButton.click(function () {
+    $('#start-button').click(function () {
         loadingModal.show();
         // Server will render the page with the calculated result
     });
@@ -252,7 +234,7 @@ $(document).ready(function () {
     });
 
     // Ajax: update stock numbers
-    marketCapCheckbox.click(function () {
+    $('.market-cap-checkbox').click(function () {
         updateStockNum();
     });
 
@@ -348,12 +330,15 @@ $(document).ready(function () {
     // Validate file format from basket trader
     fileInput.change(function (event) {
         const value = event.target.value;
-        if (!value.endsWith(".csv")) {
-            this.classList.add("is-invalid");
-            exportButton.prop("disabled", true);
+
+        if (value.trim() === "" || value.endsWith('.csv')) {
+            this.classList.remove('is-invalid');
+            $('#file-input-reset-button').css('right', '1.5rem');
         } else {
-            this.classList.remove("is-invalid");
+            this.classList.add('is-invalid');
+            $('#file-input-reset-button').css('right', '3rem');
         }
+
         validateExportButton();
     });
 
@@ -405,7 +390,7 @@ $(document).ready(function () {
                 }, 500);
 
                 // Show important information
-                messageModalBody.text("Please carefully read the downloaded basket trader file, " +
+                $('#info-message-modal-body').text("Please carefully read the downloaded basket trader file, " +
                     "IB-TWS may close all irrelevant positions after receiving the file. Please edit the " +
                     "file if necessary.");
                 messageModal.show();
@@ -425,15 +410,20 @@ $(document).ready(function () {
         });
     })
 
-    // Message (from server) handling for AJAX responses
+    // Handle messages from server
     function showDynamicMessage(message, type = 'info') {
-        const messagesContainer = document.getElementById('messages-container');
+        // To make sure the consistency to the classes of django messages, please refer to the 
+        // templates/_partial/_messages.html
+        const container = $(`
+            <div class="d-flex mx-1 animate__animated animate__slowest animate__fadeInfadeOut">
+                <div class='alert alert-sm alert-${type} mx-0 my-1 px-3 py-1'>
+                ${message}
+                </div>
+            </div>
+            `);
 
-        // Create message element
-        const messageElement = document.createElement('div');
-        messageElement.className = `alert alert-sm alert-${type} mx-0 my-1 px-3 py-1`;
-        messageElement.textContent = message;
-        messagesContainer.appendChild(messageElement);
+        const messagesContainer = $('#messages-container').empty();
+        messagesContainer.append(container);
     }
 
     // Add strategies list
@@ -445,72 +435,58 @@ $(document).ready(function () {
             headers: {
                 'X-requested-with': 'XMLHttpRequest',
                 'Content-Type': 'application/json',
-                'X-CSRFToken': $(this).find("[name=csrfmiddlewaretoken]").val(),
+                'X-CSRFToken': csrfToken,
             },
             data: JSON.stringify($(this).serializeArray()),
             success: function (data) {
                 if (data.status === "ok") {
                     showDynamicMessage(data.message, 'success');
-                    // console.log("message from server: ", data.message);
+
+                    // Update '#add-strategy-message-modal-body'
+                    if (data.updated_list && data.updated_list.length > 0) {
+                        $('#add-strategy-message-modal-body').empty();
+
+                        // Create Form
+                        let newForm = $(`
+                        <form id="form-add-strategy-to-list" method="post"
+                            action=${$('#add-strategy-message-modal-body').attr('data-url')}>
+                            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                        </form>
+                        `)
+                        
+                        // Add Checkboxes for Strategies List
+                        data.updated_list.forEach(function (item) {
+                            const div = $(`
+                            <div class="form-check">
+                                <div class="mb-3 d-flex">
+                                    <input class="form-check-input me-2" type="checkbox" id="checkbox-${item.title}">
+                                    <label class="form-check-label flex-grow-1" for="checkbox-${item.title}">${item.title}</label>
+                                    <small class="text-secondary">created on: ${item.created_on}</small>
+                                </div>
+                            </div>
+                            `)
+                            newForm.append(div);
+                        })
+
+                        // Add button
+                        let button = $('<button class="btn btn-primary"><i class="bi-plus-circle-fill me-2"></i>Add</button>');
+                        newForm.append(button);
+
+                        // Append Form and Show Modal
+                        $('#add-strategy-message-modal-body').append(newForm);
+                        $('#add-strategy-list-modal').modal('hide');
+                        $('#add-strategy-modal').modal('show');
+                    }
                 }
+
+                // Clear Error Message
                 $('#error-message-create-strategies-list').text("");
-                $("#add-strategy-list-modal").modal("hide");
             },
             error: function (xhr, status, error) {
+                // Show Error Message
                 $('#error-message-create-strategies-list').text(
                     JSON.parse(xhr.responseText).message
                 );
-            }
-        });
-    });
-
-    // Button click handler (My Strategy Button), send ajax request to update database
-    // todo: to be continue
-    $('.my-strategy_xxx').click(function (e) {
-        // $('.my-strategy').click(function (e) {
-        // Get button values
-        let action = e.target.value.split(',')[0].trim();
-        let sector = e.target.value.split(',')[1].trim();
-
-        // Send AJAX request
-        $.ajax({
-            url: 'alter-my-strategy',
-            type: 'POST',
-            headers: {
-                'X-requested-with': 'XMLHttpRequest',
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
-            },
-            data: JSON.stringify({
-                "action": action,
-                "market_cap": scriptTag.attr("market_cap"),
-                "pos_hold": scriptTag.attr("pos_hold"),
-                "min_stock_price": scriptTag.attr("min_stock_price"),
-                "sorting_method": scriptTag.attr("sorting_method"),
-                "sector": sector,
-                "formula": scriptTag.attr("formula"),
-            }),
-            success: function (data) {
-                if (data.message) {
-                    showDynamicMessage(data.message, data.message_type || 'info');
-                    // Toggle button text, value and classes
-                    const button = $(e.target);
-                    if (action === 'add') {
-                        button.text('Delete')
-                            .val('delete,' + sector)
-                            .removeClass('btn-primary')
-                            .addClass('btn-danger');
-                    } else {
-                        button.text('Add')
-                            .val('add,' + sector)
-                            .removeClass('btn-danger')
-                            .addClass('btn-primary');
-                    }
-                }
-            },
-            error: function (xhr, status, error) {
-                let message = JSON.parse(xhr.responseText).message;
-                showDynamicMessage(message, 'danger');
             }
         });
     });

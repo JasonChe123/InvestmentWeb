@@ -1,5 +1,5 @@
 <div class="modal fade" id="basket-trader-modal" tabindex="-1" aria-labelledby="basket-trader-modal-label"
-     aria-hidden="true">
+    aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <!-- Header -->
@@ -19,8 +19,18 @@
 
                 <!-- File uploader -->
                 <div class="mb-4">
+                    <!-- Amout Input -->
                     <label for="file-input" class="form-label">( Optional ) Upload Existing Portfolio (.csv)</label>
-                    <input class="form-control" type="file" id="file-input" accept=".csv" title="The file must be in .csv format">
+
+                    <!-- File Input -->
+                    <div class="d-flex">
+                        <input class="form-control w-100" type="file" id="file-input" accept=".csv"
+                            title="The file must be in .csv format">
+                        <button onclick="$('#file-input').val('').trigger('change')"
+                            class="btn btn-secondary btn-close my-2 position-absolute" style="right: 1.5rem;"
+                            id="file-input-reset-button"></button>
+                    </div>
+
                     <small>
                         How to export your existing portfolio from IB Trader WorkStation:<br>
                         Login to IB Trader WorkStation > Portfolio > right click > Import/Export > Export Page
@@ -35,7 +45,8 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="close-button">
                     Close
                 </button>
-                <button type="button" class="btn btn-primary" id="export-button" disabled>Export
+                <button type="button" class="btn btn-primary" id="export-button" disabled>
+                    Export
                 </button>
             </div>
         </div>

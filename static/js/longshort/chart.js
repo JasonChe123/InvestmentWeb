@@ -11,11 +11,11 @@ function main() {
     let totalCount = dataKey.filter(key => key.includes("Total")).length;
     const xValues = data['date'];
     let datasets = [];
-    let darkThemeLongColor = "rgba(130, 130, 255, 0.3)";
-    let darkThemeShortColor = "rgba(255, 130, 130, 0.3)";
+    let darkThemeLongColor = "rgba(130, 130, 255, 0.8)";
+    let darkThemeShortColor = "rgba(255, 130, 130, 0.8)";
     let darkThemeTotalColor = "rgba(130, 255, 130, 1.0)";
-    let lightThemeLongColor = "rgba(130, 130, 255, 0.3)";
-    let lightThemeShortColor = "rgba(255, 130, 130, 0.3)";
+    let lightThemeLongColor = "rgba(130, 130, 255, 0.8)";
+    let lightThemeShortColor = "rgba(255, 130, 130, 0.8)";
     let lightThemeTotalColor = "rgba(130, 255, 130, 1.0)";
     let darkThemeSP500Color = "#ffffff";
     let lightThemeSP500Color = "#000000";
@@ -35,6 +35,7 @@ function main() {
                 fill: false,
                 label: totalCount > 1 ? label.replace(" Total", "") : label,
                 lineTension: 0.2,
+                pointRadius: 0,
             });
         }
     });

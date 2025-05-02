@@ -151,7 +151,10 @@ class BackTestView(View):
         return render(request, "long_short/index.html", self.html_context)
 
     def post(self, request):
-        """Start backtesting"""
+        """
+        Receive request from id="start-button" of templates/long_short/input_parameters,
+        then perform backtest.
+        """
         # Get user's inputs
         market_cap = request.POST.getlist("market-cap")
         method = request.POST.get("selected-method").rstrip("+-*/")
@@ -237,16 +240,16 @@ class BackTestView(View):
                         i["mdd"] = mdd
                         i["rtr"] = rtr
 
-        # Get a list of sectors from LongShortEquity
-        my_strategy = get_my_strategy(
-            request.user,
-            market_cap,
-            pos_hold,
-            min_stock_price,
-            sorting_method.lower() == "ascending",
-            method,
-        )
-        self.html_context["my_strategy"] = my_strategy
+        # # Get a list of sectors from LongShortEquity
+        # my_strategy = get_my_strategy(
+        #     request.user,
+        #     market_cap,
+        #     pos_hold,
+        #     min_stock_price,
+        #     sorting_method.lower() == "ascending",
+        #     method,
+        # )
+        # self.html_context["my_strategy"] = my_strategy
 
         # Update html context
         self.html_context["result"] = True
@@ -269,6 +272,11 @@ class BackTestView(View):
             self.html_context["sp500_rtr"] = get_risk_to_return_ratio(
                 mdd, chart_data["S&P_500"]
             )
+
+        # Add Strategies List
+        self.html_context["strategies_list"] = StrategiesList.objects.filter(
+            user=request.user
+        )
 
         return render(request, "long_short/index.html", self.html_context)
 
@@ -543,28 +551,28 @@ def separate_words(string: str) -> str:
     return re.sub(r"(?<![A-Z])(?=[A-Z])", " ", string).strip()
 
 
-def get_my_strategy(
-    user: User,
-    market_cap: list,
-    pos_side_per_sector: int,
-    min_stock_price: int,
-    sort_ascending: bool,
-    formula: str,
-) -> set:
-    """Return a set of sectors which matches the criteria'"""
-    res = LongShortEquity.objects.filter(
-        user=user,
-        market_cap=market_cap,
-        position_side_per_sector=pos_side_per_sector,
-        min_stock_price=min_stock_price,
-        sort_ascending=sort_ascending,
-        formula=formula,
-    ).values_list("sector", flat=True)
+# def get_my_strategy(
+#     user: User,
+#     market_cap: list,
+#     pos_side_per_sector: int,
+#     min_stock_price: int,
+#     sort_ascending: bool,
+#     formula: str,
+# ) -> set:
+#     """Return a set of sectors which matches the criteria'"""
+#     res = LongShortEquity.objects.filter(
+#         user=user,
+#         market_cap=market_cap,
+#         position_side_per_sector=pos_side_per_sector,
+#         min_stock_price=min_stock_price,
+#         sort_ascending=sort_ascending,
+#         formula=formula,
+#     ).values_list("sector", flat=True)
 
-    if res.count() == 0:
-        return []
+#     if res.count() == 0:
+#         return []
 
-    return [sector.replace("-", " ").title() for sector in res]
+#     return [sector.replace("-", " ").title() for sector in res]
 
 
 def get_us_stocks(
@@ -1120,8 +1128,6 @@ def export_csv(request) -> HttpResponse:
     return response
 
 
-@require_POST
-@login_required
 def get_expected_position(l_tables: list, amount: int) -> pd.DataFrame:
     """
     Convert frontend data to dataframe, and calculate expected position for the latest period.
@@ -1290,7 +1296,7 @@ def update_stock_numbers(request):
 @login_required
 def add_strategies_list(request):
     """
-    To add a strategies_list from model StrategiesList. Return
+    To add a strategies_list to StrategiesList.
     """
     data = json.loads(request.body)
     # [{'name': name, 'value': value}, ...]
@@ -1322,11 +1328,17 @@ def add_strategies_list(request):
             StrategiesList.objects.create(
                 user=request.user, title=list_name, description=description
             )
+            updated_list = list(
+                StrategiesList.objects.filter(user=request.user).values(
+                    "id", "title", "created_on"
+                )
+            )
             return JsonResponse(
                 {
                     "message": f"Strategies List '{list_name}' added successfully.",
                     "message_type": "success",
                     "status": "ok",
+                    "updated_list": updated_list,
                 },
                 status=200,
             )
@@ -1340,3 +1352,22 @@ def add_strategies_list(request):
                 },
                 status=500,
             )
+
+
+@require_POST
+@login_required
+def add_strategies_to_list(request):
+    """
+    To add a LongShortEquity to StrategiesList.
+    """
+    try:
+        
+        return JsonResponse(
+            {"message": "success", "message_type": "success", "status": "ok"},
+            status=200,
+        )
+    except Exception as e:
+        pass
+        LongShortEquity
+
+        return JsonResponse({}, status=400)

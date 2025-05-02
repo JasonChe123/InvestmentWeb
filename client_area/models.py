@@ -1,5 +1,6 @@
-from django.db import models
+from django.core.validators import FileExtensionValidator
 from django.contrib.auth.models import User
+from django.db import models
 from django.urls import reverse
 
 
@@ -9,7 +10,10 @@ class Profile(models.Model):
     last_name = models.CharField(max_length=50, null=True, blank=True)
     nick_name = models.CharField(max_length=50, null=True, blank=True)
     profile_picture = models.ImageField(
-        upload_to="profile_pics/", null=True, blank=True
+        upload_to="profile_pics/",
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(["jpeg", "jpg", "png"])],
     )
 
     def __str__(self):

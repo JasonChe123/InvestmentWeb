@@ -1,7 +1,9 @@
 {% if messages %}
-{% for message in messages %}
-<div {% if message.tags %} class="alert alert-sm alert-{{ message.tags }} mx-0 my-1 px-3 py-1" {% endif %}>
-    {{ message }}
+<div class="d-flex mx-1 animate__animated animate__slowest animate__fadeInfadeOut">
+    {% for message in messages %}
+    <div {% if message.tags %} class="alert alert-sm alert-{{ message.tags }} mx-0 my-1 px-3 py-1" {% endif %}>
+        {{ message }}
+    </div>
 </div>
 {% endfor %}
 {% endif %}

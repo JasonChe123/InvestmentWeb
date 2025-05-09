@@ -10,5 +10,4 @@ urlpatterns = [
     path("backtest/export-csv", views.export_csv, name="export-csv"),
     path("backtest/strategies-list/add", views.add_strategies_list, name="add-strategies-list"),
     path("backtest/strategy/add", views.add_strategies_to_list, name="add-strategy-to-list"),
-    # path("alter-my-strategy", views.alter_my_strategy, name="add-my-strategy"),
 ]

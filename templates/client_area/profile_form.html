@@ -10,6 +10,8 @@
 <div class="container-fluid p-4">
     <h2 class="mb-4">{{ title }}</h2>
 
+    {{ form.errors.profile_picture }}
+
     <!-- Profile Form -->
     <form action="" method="post" disabled="true" enctype="multipart/form-data">
         {% csrf_token %}
@@ -50,7 +52,7 @@
                 <br>
                 <input method="post" type="submit" value="Save" class="btn btn-primary">
                 <input method="" type="button" value="Cancel" class="btn btn-secondary"
-                    onclick="location.href='{% url 'client_profile' %}'">
+                    onclick=location.href="{% url 'client_profile' %}">
             </div>
         </div>
     </form>

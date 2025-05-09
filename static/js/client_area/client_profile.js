@@ -3,8 +3,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const profilePictureInput = document.getElementById('profile-picture-input');
     const profilePicture = document.getElementById('profile-picture');
 
-    console.log(profilePictureInput, profilePicture);
-    
     if (profilePictureInput && profilePicture) {
         profilePictureInput.addEventListener('change', function(e) {
             if (e.target.files && e.target.files[0]) {

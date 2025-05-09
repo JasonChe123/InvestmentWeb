@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.db import models
 
 
@@ -110,20 +111,28 @@ class Stock(models.Model):
     market_cap = models.BigIntegerField(null=True)
 
     def __str__(self):
-        return self.ticker
+        return f'<{self.ticker}> {self.name}'
+    
+    class Meta:
+        ordering = ["ticker", "name"]
 
 
 class CandleStick(models.Model):
     stock = models.ForeignKey(Stock, on_delete=models.CASCADE)
-    date = models.DateTimeField()
+    date = models.DateField()
     open = models.DecimalField(max_digits=20, decimal_places=2, null=True)
     high = models.DecimalField(max_digits=20, decimal_places=2, null=True)
     low = models.DecimalField(max_digits=20, decimal_places=2, null=True)
     close = models.DecimalField(max_digits=20, decimal_places=2, null=True)
     # adj_close = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     volume = models.BigIntegerField(null=True, blank=True)
+    turnover = models.BigIntegerField(null=True, blank=True)
 
+    def __str__(self):
+        return f'CandleStick <{self.stock.ticker}> {datetime.strftime(self.date, '%Y-%m-%d')}'
+    
     class Meta:
+        ordering = ["stock__id", "-date"]
         unique_together = ("stock", "date")
 
 
@@ -170,6 +179,12 @@ class IncomeStatement(models.Model):
     TotalExpenses = models.BigIntegerField(null=True)
     InterestExpenses = models.BigIntegerField(null=True)
     Ebit = models.BigIntegerField(null=True)
+
+    def __str__(self):
+        return f'IncomeStatement <{self.stock.ticker}> {self.FileDate}'
+    
+    class Meta:
+        ordering = ["stock__id", "-FileDate"]
 
 
 class BalanceSheet(models.Model):
@@ -227,6 +242,12 @@ class BalanceSheet(models.Model):
     InvestedCapital = models.BigIntegerField(null=True)
     NetDebt = models.BigIntegerField(null=True)
 
+    def __str__(self):
+        return f'BalanceSheet <{self.stock.ticker}> {self.FileDate}'
+
+    class Meta:
+        ordering = ["stock__id", "-FileDate"]
+
 
 class CashFlow(models.Model):
     stock = models.ForeignKey(Stock, on_delete=models.CASCADE)
@@ -276,3 +297,9 @@ class CashFlow(models.Model):
 
     # Other important indicators calculated separately
     FreeCashFlow = models.BigIntegerField(null=True)
+
+    def __str__(self):
+        return f'CashFlow <{self.stock.ticker}> {self.FileDate}'
+    
+    class Meta:
+        ordering = ["stock__id", "-FileDate"]

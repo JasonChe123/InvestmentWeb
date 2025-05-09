@@ -1,28 +1,25 @@
+# Folders
 companyfacts/
 css/
 media/profile_pics/
 not_use/
 webfonts/
 
+# Files
 __pycache__
-db.sqlite3
-
 nasdaq_screener.csv
 stock_list.csv
-
-company_tickers.json
-
+logo.html
 bootstrap.bundle.min.js
 bootstrap.bundle.min.js.map
 jquery-3.6.0.min.js
 Chart.js
-
-logo.html
-
+company_tickers.json
 django.log
-
+db.sqlite3
 problem_solving_history.md
 
+# File Types
 .env
 .idea
 .venv

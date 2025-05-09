@@ -328,7 +328,7 @@ def get_last_close(ticker: str) -> float:
         return None
 
     # Get candlesticks
-    today = dt.datetime.today().replace(tzinfo=dt.timezone.utc)
+    today = dt.datetime.today()
     candlesticks = CandleStick.objects.filter(
         stock=stock.first(),
         date__gte=today - dt.timedelta(days=30),

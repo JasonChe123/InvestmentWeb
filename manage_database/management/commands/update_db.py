@@ -3,6 +3,11 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.db.models import Q
 from InvestmentWeb.settings import STATICFILES_DIRS
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 import json
 import logging
 from manage_database.models import (
@@ -21,6 +26,7 @@ import numpy as np
 import os
 import pandas as pd
 import requests
+from InvestmentWeb.settings import BASE_DIR
 import time
 from tqdm import tqdm
 from typing import Type
@@ -58,8 +64,8 @@ class Command(BaseCommand):
             self._update_stock_list()
 
         if options.get("update_candlesticks"):
+            # todo: another data source to be considered
             self._update_candlesticks()
-            # self._update_candlesticks_by_ibapi()
 
         if options.get("update_reports"):
             self._update_reports()
@@ -117,7 +123,7 @@ class Command(BaseCommand):
             country = row["Country"]
             sector = row["Sector"]
             industry = row["Industry"]
-            market_cap = row['Market Cap']
+            market_cap = row["Market Cap"]
 
             # Deal with missing data
             ipo_year = 0 if np.isnan(ipo_year) else ipo_year
@@ -175,14 +181,19 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE("Finish updating stock list."))
 
     def _update_candlesticks(self):
+        self._update_candlesticks_yfinance()
+
+    def _update_candlesticks_yfinance(self):
         # Start message
         self.stdout.write(self.style.NOTICE("Start updating candlesticks..."))
 
-        # Default downloading 5 years candlestick data
-        start_date = dt.date.today() - dt.timedelta(days=365 * 5)
+        # Default downloading 6 years candlestick data
+        start_date = dt.date.today() - dt.timedelta(days=365 * 6)
 
         # Init stock list
-        stocks = {stock.ticker: stock for stock in Stock.objects.all().exclude(ticker="SFB")}
+        stocks = {
+            stock.ticker: stock for stock in Stock.objects.all().exclude(ticker="SFB")
+        }
         ticker_list = list(stocks.keys())
         batch_size = 150
 
@@ -209,20 +220,22 @@ class Command(BaseCommand):
                     data_for_ticker = data.xs(ticker, axis=1, level=1)
                     for index, row in data_for_ticker.iterrows():
                         stock = stocks.get(ticker)
-                        
+
                         # Validate stock before create CandleStick
                         if not stock:
                             logging.info(f"{ticker} not found from database, Please.")
                             continue
-                        
-                        date = row.name  # yf uses date as index name
-                        date = date.replace(tzinfo=dt.timezone.utc)
+
+                        date = row.name.date()  # yf uses date as index name
                         open_ = None if np.isnan(row["Open"]) else row["Open"].round(2)
                         high = None if np.isnan(row["High"]) else row["High"].round(2)
                         low = None if np.isnan(row["Low"]) else row["Low"].round(2)
-                        close = None if np.isnan(row["Close"]) else row["Close"].round(2)
+                        close = (
+                            None if np.isnan(row["Close"]) else row["Close"].round(2)
+                        )
                         volume = None if np.isnan(row["Volume"]) else row["Volume"]
-                        
+                        turnover = None if not volume or not high or not low else int((high - low) / 2 * volume)
+
                         candlestick = CandleStick(
                             stock=stock,
                             date=date,
@@ -231,6 +244,7 @@ class Command(BaseCommand):
                             low=low,
                             close=close,
                             volume=volume,
+                            turnover=turnover,
                         )
 
                         l_candlesticks.append(candlestick)
@@ -243,7 +257,7 @@ class Command(BaseCommand):
                 wait_time = 60 - (time.time() - start_time)
                 if wait_time > 0:
                     time.sleep(wait_time)
-
+            
         # Finish message
         self.stdout.write(self.style.NOTICE("Finished updating candlesticks."))
 

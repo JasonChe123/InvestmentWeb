@@ -52,8 +52,11 @@
     </section>
     {% else %}
     <h3>You have no strategies yet</h3>
-    <button onclick="location.href='{% url 'strategy_pool' %}'" class="btn btn-primary">Explore Strategies</button>
-    <button onclick="location.href='{% url 'strategies_list' %}'" class="btn btn-secondary"></i>Back</button>
+    <button onclick=location.href="{% url 'strategy_pool' %}" class="btn btn-primary">Explore Strategies</button>
+    <button onclick=location.href="{% url 'strategies_list' %}" class="btn btn-secondary"></i>Back</button>
+    
+    <button onclick=location.href="{% url 'strategies_list' %}" class="btn btn-secondary"></i>Back</button>
+    
     {% endif %}
 </div>
 {% endblock client_area_content%}

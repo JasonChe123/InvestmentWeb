@@ -23,7 +23,7 @@ class LongShortEquity(models.Model):
     market_cap = ArrayField(
         models.CharField(max_length=20, null=True), size=6, null=True, blank=True
     )
-    position_side_per_sector = models.IntegerField(null=False)
+    position_side = models.IntegerField(null=False)
     min_stock_price = models.IntegerField(null=False)
     sector = models.CharField(null=False, max_length=100)
     formula = models.CharField(null=False, max_length=500)
@@ -47,7 +47,7 @@ class LongShortEquity(models.Model):
                 "user",
                 "strategies_list",
                 "market_cap",
-                "position_side_per_sector",
+                "position_side",
                 "min_stock_price",
                 "sector",
                 "formula",

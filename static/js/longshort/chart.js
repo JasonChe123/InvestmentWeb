@@ -111,9 +111,9 @@ function main() {
         chart.update();
     }
 
-    // Detect current theme
+    // Detect current theme (always set it to 'light')
     function isDarkTheme() {
-        localStorage.setItem('theme', 'light'); // todo: always set to 'light'
+        localStorage.setItem('theme', 'light');
         return localStorage.getItem('theme') === 'dark';
     }
 

@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "advanced_filters",
     # my apps
     'account_username_validation.apps.AccountUsernameValidationConfig',
     "client_area.apps.ClientAreaConfig",

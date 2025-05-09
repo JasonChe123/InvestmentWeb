@@ -28,16 +28,16 @@ My Strategies
 
             <!-- Strategies View Button -->
             <button class="btn w-100 h-100 position-absolute z-1" style="left: 0; top: 0;"
-                onclick="location.href='{% url 'my_strategies' list.id %}'"></button>
+                onclick=location.href="{% url 'my_strategies' list.id %}"></button>
 
             <!-- Edit/ Delete Buttons -->
             <div class="d-flex" style="min-height: 35px;">
                 <div class="d-flex position-absolute z-2">
                     <button class="btn btn-sm btn-secondary me-2"
-                        onclick="location.href='{% url 'strategies_list_update' list.id %}'">
+                        onclick=location.href="{% url 'strategies_list_update' list.id %}">
                         <i class="bi-pen me-2"></i>Edit</button>
                     <button class="btn btn-sm btn-danger"
-                        onclick="location.href='{% url 'strategies_list_delete' list.id %}'">
+                        onclick=location.href="{% url 'strategies_list_delete' list.id %}">
                         <i class="bi-trash3 me-2"></i>Delete</button>
                 </div>
             </div>
@@ -50,7 +50,7 @@ My Strategies
     {% endif %}
 
     <!-- Add Button -->
-    <div role="button" class="btn btn-primary mt-3" onclick="location.href='{% url 'strategies_list_create' %}'">
+    <div role="button" class="btn btn-primary mt-3" onclick=location.href="{% url 'strategies_list_create' %}">
         <i class="bi-plus-circle-fill me-2"></i>
         <span>Add</span>
     </div>

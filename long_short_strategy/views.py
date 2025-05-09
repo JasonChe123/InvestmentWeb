@@ -25,17 +25,19 @@ from manage_database.models import (
 import numpy as np
 import pandas as pd
 import re
-from typing import Tuple
+from typing import Tuple, List
 from .models import LongShortEquity
 from client_area.models import StrategiesList
 
 
 # todo: Change order type and ignore order amount under $100
-# 1. Order: Type: REL, Price 5% from previous close, allow outside RTH, Aux. Price 0.01, round qty to nearest decimal if possible
-# 2. Ignore any order if its amount is less $100
+# - Order: Type: REL, Price 5% from previous close, allow outside RTH, Aux. Price 0.01, round qty to nearest decimal if possible
+# - Ignore any order if its amount is less $100
+# - Add 'max recovery period', 'profit factor', 'car/mdd' (compound annual return to mdd), 'sharpe ratio', 'ulcer index'
+# - remove unnecessary pip packages
+# - add combined equity curve
 
-
-market_cap = {
+MARKET_CAP = {
     "Mega (>$200B)": 200_000_000_000,
     "Large ($10B-$200B)": range(10_000_000_000, 200_000_000_001),
     "Medium ($2B-$10B)": range(2_000_000_000, 10_000_000_001),
@@ -43,7 +45,7 @@ market_cap = {
     "Micro ($50M-$300M)": range(50_000_000, 300_000_001),
     "Nano (<$50M)": range(0, 50_000_001),
 }
-sectors = [
+SECTORS = [
     "Basic Materials",
     "Consumer Discretionary",
     "Consumer Staples",
@@ -57,17 +59,28 @@ sectors = [
     "Telecommunications",
     "Utilities",
 ]
+TURNOVER = {
+    "100K": 100_000,
+    "500K": 500_000,
+    "1M": 1_000_000,
+    "5M": 5_000_000,
+    "10M": 10_000_000,
+    "50M": 50_000_000,
+    "100M": 100_000_000,
+}
 
 
 @method_decorator(login_required, name="dispatch")
 class BackTestView(View):
     def __init__(self):
         super().__init__()
-        self.market_cap = market_cap
-        self.backtest_years = [i for i in range(1, 6)]
-        self.pos_hold = [50, 40, 30, 20, 10]
+        self.market_cap = MARKET_CAP
+        self.backtest_year_from = [dt.date.today().year - i for i in range(5, -1, -1)]
+        self.backtest_years = [i for i in range(1, 7)]
+        self.pos_hold = [10, 20, 30, 40, 50]
         self.min_stock_price = [1, 2, 3, 4, 5, 10]
-        self.sectors = {sector: 0 for sector in sectors}
+        self.min_turnover = TURNOVER
+        self.sectors = {sector: 0 for sector in SECTORS}
         self.long_total = 0
         self.short_total = 0
         self.longshort_annualized = 0
@@ -134,17 +147,21 @@ class BackTestView(View):
             "market_cap": self.market_cap.keys(),
             "sectors": self.sectors,
             "all_stocks_num": 0,
+            "backtest_year_from": self.backtest_year_from,
             "backtest_years": self.backtest_years,
             "pos_hold": self.pos_hold,
             "min_stock_price": self.min_stock_price,
+            "min_turnover": self.min_turnover.keys(),
         }
 
     def get(self, request):
         # Default parameters
         self.html_context["selected_market_cap"] = list(self.market_cap.keys())[:-1]
-        self.html_context["selected_backtest_years"] = 1
-        self.html_context["selected_pos_hold"] = 10
-        self.html_context["selected_min_stock_price"] = 10
+        self.html_context["selected_backtest_year_from"] = self.backtest_year_from[0]
+        self.html_context["selected_backtest_years"] = self.backtest_years[0]
+        self.html_context["selected_pos_hold"] = self.pos_hold[0]
+        self.html_context["selected_min_stock_price"] = self.min_stock_price[0]
+        self.html_context["selected_min_turnover"] = "100K"
         self.html_context["selected_sorting_method"] = "Descending"
         self.html_context["csrf_token"] = csrf(request)["csrf_token"]
 
@@ -159,25 +176,29 @@ class BackTestView(View):
         market_cap = request.POST.getlist("market-cap")
         method = request.POST.get("selected-method").rstrip("+-*/")
         sectors = [s for s in self.sectors if request.POST.get(s)]
+        backtest_year_from = int(request.POST.get("backtest_year_from"))
         backtest_years = int(request.POST.get("backtest_years"))
         pos_hold = int(request.POST.get("pos_hold"))
         min_stock_price = int(request.POST.get("min_stock_price"))
+        min_turnover = self.min_turnover.get(request.POST.get("min_turnover"))
         sorting_method = request.POST.get("sorting_method")
 
-        # Add to context
+        # Update html context
         self.html_context.update(
             {
                 "selected_market_cap": market_cap,
                 "selected_method": method,
                 "selected_sectors": sectors,
+                "selected_backtest_year_from": backtest_year_from,
                 "selected_backtest_years": backtest_years,
                 "selected_pos_hold": pos_hold,
                 "selected_min_stock_price": min_stock_price,
+                "selected_min_turnover": request.POST.get("min_turnover"),
                 "selected_sorting_method": sorting_method,
             }
         )
 
-        # Check input validity
+        # Validate input
         if not market_cap:
             messages.warning(request, "Please select Market Cap.")
             return render(request, "long_short/index.html", self.html_context)
@@ -201,9 +222,11 @@ class BackTestView(View):
                     market_cap,
                     sector,
                     method,
+                    backtest_year_from,
                     backtest_years,
                     pos_hold,
                     min_stock_price,
+                    min_turnover,
                     sorting_method,
                 )
 
@@ -216,7 +239,7 @@ class BackTestView(View):
         chart_data = self.add_chart_data()
         chart_data.iloc[:, 1:] = chart_data.iloc[:, 1:].astype(float).round(2)
         chart_data["date"] = chart_data["date"].apply(
-            lambda value: dt.datetime.strftime(value, "%d-%b-%Y")
+            lambda value: dt.date.strftime(value, "%d-%b-%Y")
         )
         chart_data = chart_data.infer_objects(copy=False)
         chart_data.ffill(inplace=True)
@@ -239,17 +262,6 @@ class BackTestView(View):
                     if i["sector"] == col.replace("_Total", ""):
                         i["mdd"] = mdd
                         i["rtr"] = rtr
-
-        # # Get a list of sectors from LongShortEquity
-        # my_strategy = get_my_strategy(
-        #     request.user,
-        #     market_cap,
-        #     pos_hold,
-        #     min_stock_price,
-        #     sorting_method.lower() == "ascending",
-        #     method,
-        # )
-        # self.html_context["my_strategy"] = my_strategy
 
         # Update html context
         self.html_context["result"] = True
@@ -286,15 +298,17 @@ class BackTestView(View):
         market_cap,
         sector,
         method,
+        backtest_year_from,
         backtest_years,
         pos_hold,
         min_stock_price,
+        min_turnover,
         sorting_method,
     ):
         """
         Backtest strategy and add the result to self.html_context.
         """
-        # Get US stocks
+        # Get US stocks by market cap and sector
         try:
             df_us_stocks = get_us_stocks(market_cap, sector)
         except Exception as e:
@@ -306,18 +320,21 @@ class BackTestView(View):
             return
 
         # Get re-balancing dates
-        l_re_balancing_dates = get_re_balancing_dates(backtest_years)
+        l_re_balancing_dates = get_re_balancing_dates(
+            backtest_year_from, backtest_years
+        )
 
         # Get result by method for all stocks
         results = get_result_from_method(
             method,
             df_us_stocks["Ticker"].tolist(),
             min_stock_price,
+            min_turnover,
             l_re_balancing_dates,
         )
-
+        
         # Sort stocks by method, get top and bottom stocks by pos_hold, and split results by re-balancing dates
-        result_subset = ranking(results, sorting_method, min_stock_price)
+        result_subset = ranking(results, sorting_method, min_stock_price, min_turnover)
 
         # Get performance for all stocks
         df_top, df_bottom = get_performance(result_subset, pos_hold)
@@ -421,9 +438,8 @@ class BackTestView(View):
 
                 # Get start date and end date
                 date = df_data.iloc[:, i : i + 3].columns[1]
-                start_date = dt.datetime.strptime(date, "%b %Y").replace(
-                    tzinfo=dt.timezone.utc
-                )
+
+                start_date = dt.datetime.strptime(date, "%b %Y").date()
                 end_date = start_date.replace(
                     day=monthrange(start_date.year, start_date.month)[-1]
                 )
@@ -443,9 +459,12 @@ class BackTestView(View):
                     df_ticker = data.copy().reset_index(drop=True)
 
                     # Calculate performance
-                    df_ticker[f"{ticker}_perf_percent"] = (
-                        df_ticker["close"] / df_ticker["open"][0] - 1
-                    ) * 100
+                    try:
+                        df_ticker[f"{ticker}_perf_percent"] = (
+                            df_ticker["close"] / df_ticker["open"].iloc[-1] - 1
+                        ) * 100
+                    except TypeError as e:
+                        logging.error(f"TypeError from calculating performance: {e}")
 
                     # Merge to df_temp
                     df_temp = df_temp.merge(
@@ -487,22 +506,22 @@ class BackTestView(View):
             matching_columns = [
                 col for col in data["df_top"].columns if re.match(date_pattern, col)
             ]
-            start_date = dt.datetime.strptime(matching_columns[0], "%b %Y").replace(
-                tzinfo=dt.timezone.utc
-            )
-            end_date = dt.datetime.strptime(matching_columns[-1], "%b %Y").replace(
-                tzinfo=dt.timezone.utc
-            )
+            start_date = dt.datetime.strptime(matching_columns[0], "%b %Y").date()
+            end_date = dt.datetime.strptime(matching_columns[-1], "%b %Y").date()
             end_date = end_date.replace(
                 day=monthrange(end_date.year, end_date.month)[-1]
             )
 
             # Get candlesticks (date, stock__ticker, open, close) for all tickers, from start_date to end_date
-            res = CandleStick.objects.filter(
-                stock__ticker__in=tickers,
-                date__gte=start_date,
-                date__lte=end_date,
-            ).values("date", "stock__ticker", "open", "close")
+            res = (
+                CandleStick.objects.filter(
+                    stock__ticker__in=tickers,
+                    date__gte=start_date,
+                    date__lte=end_date,
+                )
+                .order_by("-date")
+                .values("date", "stock__ticker", "open", "close")
+            )
             df_candlesticks = pd.DataFrame(res)
 
             # Add performance from start_date to end_date
@@ -529,13 +548,19 @@ class BackTestView(View):
 
         # Add performance of S&P_500 (ticker: ^GSPC) to df_total
         if self.html_context["data"]:
-            res = CandleStick.objects.filter(
-                stock__ticker="^GSPC",
-                date__gte=start_date,
-                date__lte=end_date,
-            ).values("date", "stock__ticker", "open", "close")
+            res = (
+                CandleStick.objects.filter(
+                    stock__ticker="^GSPC",
+                    date__gte=start_date,
+                    date__lte=end_date,
+                )
+                .order_by("-date")
+                .values("date", "stock__ticker", "open", "close")
+            )
             df_sp500 = pd.DataFrame(res)
-            df_sp500["S&P_500"] = (df_sp500["close"] / df_sp500["open"][0] - 1) * 100
+            df_sp500["S&P_500"] = (
+                df_sp500["close"] / df_sp500["open"].iloc[-1] - 1
+            ) * 100
             df_sp500["S&P_500"] = df_sp500["S&P_500"].astype(float).round(2)
             df_total = df_total.merge(
                 df_sp500[["date", "S&P_500"]], on="date", how="left"
@@ -551,30 +576,6 @@ def separate_words(string: str) -> str:
     return re.sub(r"(?<![A-Z])(?=[A-Z])", " ", string).strip()
 
 
-# def get_my_strategy(
-#     user: User,
-#     market_cap: list,
-#     pos_side_per_sector: int,
-#     min_stock_price: int,
-#     sort_ascending: bool,
-#     formula: str,
-# ) -> set:
-#     """Return a set of sectors which matches the criteria'"""
-#     res = LongShortEquity.objects.filter(
-#         user=user,
-#         market_cap=market_cap,
-#         position_side_per_sector=pos_side_per_sector,
-#         min_stock_price=min_stock_price,
-#         sort_ascending=sort_ascending,
-#         formula=formula,
-#     ).values_list("sector", flat=True)
-
-#     if res.count() == 0:
-#         return []
-
-#     return [sector.replace("-", " ").title() for sector in res]
-
-
 def get_us_stocks(
     market_cap_filter: list = [],
     sector_filter: str | list = None,
@@ -582,8 +583,8 @@ def get_us_stocks(
     """
     Return us stocks information by selected market cap and sectors.
     """
-    market_cap_str = list(market_cap.keys())
-    market_cap_value = list(market_cap.values())
+    market_cap_str = list(MARKET_CAP.keys())
+    market_cap_value = list(MARKET_CAP.values())
 
     # Get selected market cap
     mega = market_cap_str[0] in market_cap_filter
@@ -644,19 +645,22 @@ def get_us_stocks(
     return results
 
 
-def get_re_balancing_dates(backtest_years: int = 1) -> list:
+def get_re_balancing_dates(
+    backtest_year_from: int = dt.date.today().year, backtest_years: int = 1
+) -> List[dt.date]:
     """
     Retrun a list of re-balancing dates for backtesting.
     (re-balancing dates are the first day of every months)
     """
-    l_months = []
-    this_month = dt.datetime.now(tz=dt.timezone.utc).replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0
-    )
-    [
-        l_months.append(this_month - relativedelta(months=m))
-        for m in reversed(range(backtest_years * 12))
-    ]
+    start_date = dt.date(backtest_year_from, 1, 1)
+    end_date = start_date + relativedelta(months=backtest_years * 12 - 1)
+    l_months = [start_date]
+    end_date = min(end_date, dt.date.today().replace(day=1))
+
+    while True:
+        l_months.append(l_months[-1] + relativedelta(months=1))
+        if l_months[-1] >= end_date:
+            break
 
     return l_months
 
@@ -665,6 +669,7 @@ def get_result_from_method(
     formula: str,
     stock_list: list,
     min_stock_price: float,
+    min_turnover: int,
     re_balancing_dates: list,
 ) -> pd.DataFrame:
     """
@@ -705,16 +710,20 @@ def get_result_from_method(
     df_result = pd.DataFrame(columns=["stock__ticker"], data=stock_list)
 
     for date in re_balancing_dates:
-        # Get stock ids by min_stock_price and dates
+        # Get stock ids by min_stock_price and min_turnover for the past 30 days
         res = CandleStick.objects.filter(
             stock__ticker__in=stock_list,
             close__gte=min_stock_price,
+            turnover__gte=min_turnover,
             date__lt=date,
             date__gte=date - dt.timedelta(days=30),
         ).values_list("stock__id", flat=True)
-        stock_ids = list(set(res))
+
+        if not res.count():
+            continue
 
         # Get data from database
+        stock_ids = list(set(res))
         df_report = pd.DataFrame(columns=["stock__ticker"])
         if l_income_statement:
             df_report = merge_report(
@@ -732,13 +741,13 @@ def get_result_from_method(
             df_report = merge_report(CashFlow, df_report, stock_ids, date, l_cash_flow)
 
         # Apply formula
-        column_name = dt.datetime.strftime(date, "%Y-%m-%d")
+        column_name = dt.date.strftime(date, "%Y-%m-%d")
         df_report.fillna(0, inplace=True)
         values = apply_formula(df_report, formula, column_name)
         df_result = df_result.merge(
             values[["stock__ticker", column_name]], how="left", on="stock__ticker"
         )
-
+    
     return df_result.replace(np.nan, 0).replace(np.inf, 0).replace(-np.inf, 0)
 
 
@@ -801,7 +810,12 @@ def apply_formula(df: pd.DataFrame, formula: str, result_col_name: str) -> pd.Da
     return df
 
 
-def ranking(results: pd.DataFrame, sorting_method: str, min_stock_price: float) -> dict:
+def ranking(
+    results: pd.DataFrame,
+    sorting_method: str,
+    min_stock_price: float,
+    min_turnover: int,
+) -> dict:
     """
     Rank results for each columns except 'stock__ticker' and return
     as dict format
@@ -836,9 +850,7 @@ def get_performance(
         ticker_list = df["stock__ticker"].tolist()
 
         # Get start date and end date
-        start_date = dt.datetime.strptime(date, "%Y-%m-%d").replace(
-            tzinfo=dt.timezone.utc
-        )
+        start_date = dt.datetime.strptime(date, "%Y-%m-%d").date()
         last_day = monthrange(start_date.year, start_date.month)[-1]
         end_date = start_date.replace(day=last_day)
 
@@ -924,6 +936,7 @@ def get_mdd(series: pd.Series) -> float:
 def get_risk_to_return_ratio(mdd: float, series: pd.Series) -> float:
     """Total return divided by max drawdown"""
     series.dropna(inplace=True)
+
     return round(series.iloc[-1] / mdd, 2)
 
 
@@ -932,7 +945,7 @@ def get_risk_to_return_ratio(mdd: float, series: pd.Series) -> float:
 # -----------------------------------------------------------------------------
 @require_POST
 @login_required
-def alter_my_strategy(request):
+def xxx_alter_my_strategy_not_used_xxx(request):
     """Add/ Delete LongShortEquity from the database."""
     # Get request content
     res_content = json.loads(request.body)
@@ -964,8 +977,9 @@ def alter_my_strategy(request):
             # strategies_list="",
             name="LongShort Equity",
             market_cap=market_cap_list,
-            position_side_per_sector=int(res_content["pos_hold"]),
+            position_side=int(res_content["pos_hold"]),
             min_stock_price=int(res_content["min_stock_price"]),
+            min_turnover=int(res_content["min_turnover"]),
             sort_ascending=res_content["sorting_method"].lower() == "ascending",
             sector=res_content["sector"],
             formula=res_content["formula"],
@@ -1184,7 +1198,7 @@ def get_expected_position(l_tables: list, amount: int) -> pd.DataFrame:
         return
 
     # Get previous close for each stock
-    date = dt.datetime.strptime(date_str, "%b %Y").replace(tzinfo=dt.timezone.utc)
+    date = dt.datetime.strptime(date_str, "%b %Y").date()
     query_res = CandleStick.objects.filter(
         stock__ticker__in=df["Ticker"].tolist(), date__lt=date
     ).order_by("-date")
@@ -1273,19 +1287,19 @@ def update_stock_numbers(request):
     result = {}
 
     # Update result by sector
-    for sector in sectors:
+    for sector in SECTORS:
         result[sector] = len(stocks[stocks["sector"] == sector])
     result["All"] = sum(result.values())
 
     # Update result by market cap
-    for mc in market_cap:
+    for mc in MARKET_CAP:
         if "Mega" in mc:
-            result[mc] = len(stocks[stocks["market_cap"] >= market_cap[mc]])
+            result[mc] = len(stocks[stocks["market_cap"] >= MARKET_CAP[mc]])
         else:
             result[mc] = len(
                 stocks[
-                    (stocks["market_cap"] >= market_cap[mc][0])
-                    & (stocks["market_cap"] < market_cap[mc][-1])
+                    (stocks["market_cap"] >= MARKET_CAP[mc][0])
+                    & (stocks["market_cap"] < MARKET_CAP[mc][-1])
                 ]
             )
 
@@ -1360,14 +1374,16 @@ def add_strategies_to_list(request):
     """
     To add a LongShortEquity to StrategiesList.
     """
+    # model
+    LongShortEquity
+
     try:
-        
+
         return JsonResponse(
             {"message": "success", "message_type": "success", "status": "ok"},
             status=200,
         )
     except Exception as e:
         pass
-        LongShortEquity
 
         return JsonResponse({}, status=400)

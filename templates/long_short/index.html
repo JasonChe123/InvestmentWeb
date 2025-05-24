@@ -87,9 +87,11 @@
                             <td class="summary">{{ d.mdd }}%</td>
                             <td class="summary">{{ d.rtr }}</td>
                             <td class="summary p-1 text-center">
-                                <button class="btn btn-outline-primary my-strategy m-0 w-100"
-                                    value="add,{{ d.sector|slugify }}" data-bs-toggle="modal"
-                                    data-bs-target="#add-strategy-modal">
+                                <button class="btn btn-outline-primary m-0 w-100 add-strategy" data-bs-toggle="modal"
+                                    data-bs-target="#add-strategy-modal" market-cap="{{ selected_market_cap }}"
+                                    position-side="{{ selected_pos_hold }}"
+                                    min-stock-price="{{ selected_min_stock_price }}" sector="{{ d.sector}}"
+                                    formula="{{ selected_method }}" sort="{{ selected_sorting_method }}">
                                     Add
                                 </button>
                             </td>

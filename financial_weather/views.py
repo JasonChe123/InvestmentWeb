@@ -5,8 +5,6 @@ import logging
 import os
 import requests
 
-import pdb
-
 
 def us_economy(request):
     # data, x_axis_label = get_us_yield_curve_10y2y()

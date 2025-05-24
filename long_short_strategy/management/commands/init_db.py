@@ -1,5 +1,4 @@
 import datetime as dt
-import pdb
 
 from django.conf import settings
 from django.core.management.base import BaseCommand

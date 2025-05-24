@@ -6,21 +6,35 @@
 
             <!-- Header -->
             <div class="modal-header">
-                <h5 class="modal-title" id="message-modal-label">Select Strategies List</h5>
+                <h5 class="modal-title" id="message-modal-label">Add Strategy To My Strategies</h5>
             </div>
 
             <!-- Body -->
             <div class="modal-body" id="add-strategy-message-modal-body" data-url="{% url 'add-strategy-to-list' %}">
                 {% if strategies_list %}
-                <form method='post' action="{% url 'add-strategy-to-list' %}">
+                <form method="post" action="{% url 'add-strategy-to-list' %}" id="form-add-strategy-to-list">
                     {% csrf_token %}
                     
+                    <!-- Strategy's Param -->
+                    <label for="name" class="form-label">Strategy Name (Optional)</label>
+                    <input class='form-control' type="text" name="name" value="{{ selected_method }}" id="name">
+                    <label for="description" class="form-label">Description (optional)</label>
+                    <input class='form-control' type="text" name="description" value="" id="description">
+                    <!-- Hidden Params -->
+                    <input type="text" name="market-cap" value="" hidden>
+                    <input type="number" name="position-side" value="" hidden>
+                    <input type="number" name="min-stock-price" value="" hidden>
+                    <input type="text" name="sector" value="" hidden>
+                    <input type="text" name="formula" value="" hidden>
+                    <input type="text" name="sort" value="" hidden>
+
                     {% for list in strategies_list %}
                     <!-- Checkboxes (Strategies List) -->
                     <div class="form-check">
                         <div class="mb-3 d-flex">
-                            <input class="form-check-input me-2" type="checkbox" value=""
-                                id="checkbox-{{ list.title }}">
+                            <input name='strategy-list' class="form-check-input me-2" type="checkbox"
+                                value="{{ list.title }}" id="checkbox-{{ list.title }}"
+                                oninvalid="this.setCustomValidity('Please select a Strategy List.')" required>
                             <label class="form-check-label flex-grow-1" for="checkbox-{{ list.title }}">
                                 {{ list.title }}
                             </label>
@@ -28,7 +42,7 @@
                         </div>
                     </div>
                     {% endfor %}
-                    
+
                     <!-- Button (Add to Strategies List) -->
                     <button class="btn btn-primary"><i class="bi-plus-circle-fill me-2"></i>Add</button>
                 </form>

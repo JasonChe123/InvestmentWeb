@@ -1,43 +1,49 @@
-import datetime as dt
+import datetime
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.db.models import Q
 from InvestmentWeb.settings import STATICFILES_DIRS
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 import json
-import logging
 from manage_database.models import (
     Stock,
     CandleStick,
     IncomeStatement,
     BalanceSheet,
     CashFlow,
-)
-from manage_database.models import (
-    GAAP_TO_READABLE_NAME_BALANCE_SHEET,
-    GAAP_TO_READABLE_NAME_CASH_FLOW,
-    GAAP_TO_READABLE_NAME_INCOME_STATEMENT,
+    GAAP_TO_READABLE_NAME_INCOMESTATEMENT,
+    GAAP_TO_READABLE_NAME_BALANCESHEET,
+    GAAP_TO_READABLE_NAME_CASHFLOW,
 )
 import numpy as np
 import os
 import pandas as pd
 import requests
-from InvestmentWeb.settings import BASE_DIR
 import time
 from tqdm import tqdm
-from typing import Type
 import yfinance as yf
 import zipfile
 
 
+def print_status(func):
+    def wrapper(*args, **kwargs):
+        args[0].stdout.write(
+            args[0].style.NOTICE(f"\nStart function '{func.__name__}'...")
+        )
+        result = func(*args, **kwargs)
+        args[0].stdout.write(
+            args[0].style.SUCCESS(f"\nFinish function '{func.__name__}'.\n")
+        )
+        return result
+
+    return wrapper
+
+
 class Command(BaseCommand):
-    help = "Update database: 'Financial Reports', 'Candlesticks' and 'Stock List'"
+    help = "Update database tables 'IncomeStatement', 'BalanceSheet', 'CashFlow', 'CandleStick', 'Stock'."
 
     def add_arguments(self, parser):
+        """
+        Add arguments to the command.
+        """
         # Update stock list
         parser.add_argument(
             "--update_stock_list",
@@ -45,573 +51,491 @@ class Command(BaseCommand):
             help="Update stock list from www.nasdaq.com.",
         )
 
-        # Update candlesticks
-        parser.add_argument(
-            "--update_candlesticks",
-            action="store_true",
-            help="Update candlesticks data from yfinance.",
-        )
-
         # Update financial reports
         parser.add_argument(
             "--update_reports",
             action="store_true",
-            help="Update financial reports from www.sec.gov.",
+            help="Update reports in database tables 'IncomeStatement', 'BalanceSheet', 'CashFlow'.",
+        )
+
+        # Update financial reports
+        parser.add_argument(
+            "--update_candlesticks",
+            action="store_true",
+            help="Update candlesticks (from yfinance)",
+        )
+
+        # Update all
+        parser.add_argument(
+            "--update_all",
+            action="store_true",
+            help="Update stock list, reports, and candlesticks.",
         )
 
     def handle(self, *args, **options):
-        if options.get("update_stock_list"):
+        """
+        Handle command options.
+        """
+        if options.get("update_all"):
             self._update_stock_list()
-
-        if options.get("update_candlesticks"):
-            # todo: another data source to be considered
-            self._update_candlesticks()
-
-        if options.get("update_reports"):
             self._update_reports()
+            self._update_candlesticks()
+        else:
+            if options.get("update_stock_list"):
+                self._update_stock_list()
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Finished '{os.path.basename(__file__).split('.')[0]}' command!"
-            )
-        )
+            if options.get("update_reports"):
+                self._update_reports()
 
+            if options.get("update_candlesticks"):
+                self._update_candlesticks()
+
+    @print_status
     def _update_stock_list(self):
-        def get_stock_list() -> bool | pd.DataFrame:
-            # Read csv file
-            stock_list_path = os.path.join(
-                STATICFILES_DIRS[0], "assets", "us_stocks_data", "stock_list.csv"
-            )
-            if not os.path.isfile(stock_list_path):
-                self.stdout.write(self.style.ERROR("File 'stock_list.csv' not found."))
-                return False, None
-
-            # Filter out all symbol with '^' and NaN
-            df = pd.read_csv(stock_list_path)
-            df = df[~df["Symbol"].isna()]
-            df = df[df["Symbol"].str.len() < 5]
-            df = df[~df["Symbol"].str.contains(r"\^")]
-            df = df[~df["Symbol"].str.contains("/")].reset_index(drop=True)
-
-            return True, df
-
-        # Start message
-        self.stdout.write(self.style.NOTICE("Start updating stock list..."))
+        """
+        Read the local stock_list.csv and update its info to database.
+        """
+        # todo: download file programmatically
         self.stdout.write(
             self.style.WARNING(
-                "[ ATTENTION ] Please make sure you downloaded the stock list from "
-                "\n    https://www.nasdaq.com/market-activity/stocks/screener"
-                "\n    and saved the file 'stock_list.csv' to '/static/assets/us_stocks_data/'"
+                """
+    [ ATTENTION ] Please make sure you have downloaded the stock list from
+    https://www.nasdaq.com/market-activity/stocks/screener"
+    and saved the file 'stock_list.csv' to '/static/assets/us_stocks_data'
+"""
             )
         )
 
-        # Get stock list
-        res, df = get_stock_list()
-        if not res:
-            self.stdout.write(self.style.NOTICE("Fail updating stock list."))
+        # Validate file
+        res = read_stock_list()
+        if isinstance(res, str):
+            self.stdout.write(self.style.ERROR(res))
             return
 
-        # Update stock list
-        l_stocks = []
-        for index, row in tqdm(
-            df.iterrows(), desc="Updating Stock table from database..."
-        ):
-            # Unpack data
-            ticker = row["Symbol"].strip()
-            name = row["Name"].strip()
-            ipo_year = row["IPO Year"]
-            country = row["Country"]
-            sector = row["Sector"]
-            industry = row["Industry"]
-            market_cap = row["Market Cap"]
+        # Delete and create
+        with transaction.atomic():
+            # Delete all stocks
+            self.stdout.write(self.style.NOTICE("Deleting Stocks..."))
+            Stock.objects.all().delete()
 
-            # Deal with missing data
-            ipo_year = 0 if np.isnan(ipo_year) else ipo_year
-            country = "Unknown" if not isinstance(country, str) else country.strip()
-            sector = "Miscellaneous" if not isinstance(sector, str) else sector.strip()
-            industry = (
-                "Miscellaneous" if not isinstance(industry, str) else industry.strip()
-            )
-            market_cap = 0 if not market_cap else market_cap
+            # Add stocks to bulk-create list
+            instances_to_create = []
+            self.stdout.write(self.style.NOTICE("Adding Stocks..."))
+            for index, row in tqdm(res.iterrows(), desc="Reading stock info..."):
+                ticker = row["Symbol"].strip()
+                name = row["Name"].strip()
+                ipo_year = row["IPO Year"]
+                country = row["Country"]
+                sector = row["Sector"]
+                industry = row["Industry"]
+                market_cap = row["Market Cap"]
 
-            # Create or update
-            stock, created = Stock.objects.get_or_create(ticker=ticker)
-
-            # If no change
-            if all(
-                [
-                    stock.name == name,
-                    stock.ipo_year == ipo_year,
-                    stock.country == country,
-                    stock.sector == sector,
-                    stock.industry == industry,
-                    stock.market_cap == market_cap,
-                ]
-            ):
-                continue
-
-            # If new or changes, then update it
-            stock.name = name
-            stock.ipo_year = ipo_year
-            stock.country = country
-            stock.sector = sector
-            stock.industry = industry
-            stock.market_cap = market_cap
-
-            # Add stock instance to a list, pending to be bulk updated
-            l_stocks.append(stock)
-
-        # Bulk update
-        if len(l_stocks) > 0:
-            self.stdout.write(
-                self.style.NOTICE(
-                    f"Updating stock: {[s.ticker for s in l_stocks[:5]]}... total: {len(l_stocks)} stocks"
+                # Default value for missing data
+                ipo_year = 0 if np.isnan(ipo_year) else ipo_year
+                country = "Unknown" if not isinstance(country, str) else country.strip()
+                sector = (
+                    "Miscellaneous" if not isinstance(sector, str) else sector.strip()
                 )
-            )
-            fields = [
-                field.name
-                for field in Stock._meta.get_fields()
-                if field.concrete and field.name != "id"
-            ]
-            Stock.objects.bulk_update(l_stocks, fields=fields, batch_size=100)
-        else:
-            self.stdout.write(self.style.NOTICE("All stocks are already update."))
+                industry = (
+                    "Miscellaneous"
+                    if not isinstance(industry, str)
+                    else industry.strip()
+                )
+                market_cap = 0 if not market_cap else market_cap
 
-        # Finish message
-        self.stdout.write(self.style.NOTICE("Finish updating stock list."))
+                # Create "Stock"
+                stock = Stock(
+                    ticker=ticker,
+                    name=name,
+                    country=country,
+                    ipo_year=ipo_year,
+                    sector=sector,
+                    industry=industry,
+                    market_cap=market_cap,
+                )
+                instances_to_create.append(stock)
 
-    def _update_candlesticks(self):
-        self._update_candlesticks_yfinance()
+            # Bulk-create
+            self.stdout.write(self.style.NOTICE("Saving Stocks..."))
+            Stock.objects.bulk_create(instances_to_create, batch_size=1000)
 
-    def _update_candlesticks_yfinance(self):
-        # Start message
-        self.stdout.write(self.style.NOTICE("Start updating candlesticks..."))
-
-        # Default downloading 6 years candlestick data
-        start_date = dt.date.today() - dt.timedelta(days=365 * 6)
-
-        # Init stock list
-        stocks = {
-            stock.ticker: stock for stock in Stock.objects.all().exclude(ticker="SFB")
-        }
-        ticker_list = list(stocks.keys())
-        batch_size = 150
-
-        for i in range(0, len(ticker_list), batch_size):
-            start_time = time.time()
-
-            # Progress message
-            time_now = dt.datetime.strftime(dt.datetime.now(), "%Y-%m-%d %H:%M:%S")
-            message = f"Processing {i}-{min(len(ticker_list), i + batch_size)} of {len(ticker_list)} stocks..."
-            self.stdout.write(self.style.NOTICE(f"[ {time_now} ] {message}"))
-
-            # Download data from yfinance
-            batch = ticker_list[i : i + batch_size]
-            data = yf.download(tickers=batch, start=start_date, progress=False)
-
-            with transaction.atomic():
-                # Delete from database
-                yf_tickers = data.columns.get_level_values(1).unique().tolist()
-                CandleStick.objects.filter(Q(stock__ticker__in=yf_tickers)).delete()
-
-                # Update candlesticks
-                l_candlesticks = []
-                for ticker in yf_tickers:
-                    data_for_ticker = data.xs(ticker, axis=1, level=1)
-                    for index, row in data_for_ticker.iterrows():
-                        stock = stocks.get(ticker)
-
-                        # Validate stock before create CandleStick
-                        if not stock:
-                            logging.info(f"{ticker} not found from database, Please.")
-                            continue
-
-                        date = row.name.date()  # yf uses date as index name
-                        open_ = None if np.isnan(row["Open"]) else row["Open"].round(2)
-                        high = None if np.isnan(row["High"]) else row["High"].round(2)
-                        low = None if np.isnan(row["Low"]) else row["Low"].round(2)
-                        close = (
-                            None if np.isnan(row["Close"]) else row["Close"].round(2)
-                        )
-                        volume = None if np.isnan(row["Volume"]) else row["Volume"]
-                        turnover = None if not volume or not high or not low else int((high - low) / 2 * volume)
-
-                        candlestick = CandleStick(
-                            stock=stock,
-                            date=date,
-                            open=open_,
-                            high=high,
-                            low=low,
-                            close=close,
-                            volume=volume,
-                            turnover=turnover,
-                        )
-
-                        l_candlesticks.append(candlestick)
-
-                # Bulk create
-                CandleStick.objects.bulk_create(l_candlesticks, ignore_conflicts=True)
-
-            # Wait to avoid hitting the rate limit of yfinance
-            if len(ticker_list) - i <= batch_size:
-                wait_time = 60 - (time.time() - start_time)
-                if wait_time > 0:
-                    time.sleep(wait_time)
-            
-        # Finish message
-        self.stdout.write(self.style.NOTICE("Finished updating candlesticks."))
-
+    @print_status
     def _update_reports(self):
-        def get_column_name(data: dict) -> str:
-            """
-            Return flied_date + fiscal_period as a column name.
-            """
-            if not data.get("filed"):
-                return
-
-            file_date = data.get("filed")
-            fiscal_period = data.get("fp")
-
-            return " ".join([file_date, str(fiscal_period)])
-
-        def update_data(gaap_to_readable_name, companyfact) -> pd.DataFrame:
-            df = pd.DataFrame(
-                index=["StartDate", "EndDate", "FiscalPeriod"]
-                + list(gaap_to_readable_name.values())
-            )
-
-            # Get share issued
-            share_issued = "EntityCommonStockSharesOutstanding"
-            try:
-                share_issued_data = companyfact["facts"]["dei"][share_issued]
-                for data in share_issued_data["units"]["shares"]:
-                    col = get_column_name(data)
-                    if not col:
-                        return df
-
-                    df.at["EndDate", col] = data.get("end")
-                    df.at["StartDate", col] = data.get("start")
-                    df.at["ShareIssued", col] = data.get("val")
-            except (KeyError, AttributeError, TypeError) as e:
-                # self.stdout.write(self.style.ERROR(f"{companyfact.keys()}: {e}"))
-                pass
-
-            # Get other data
-            facts = companyfact.get("facts")
-            if not facts:
-                return df
-
-            gaap_data = facts.get("us-gaap")
-            if not gaap_data:
-                return df
-
-            us_gaaps = companyfact["facts"]["us-gaap"]
-            for gaap in set(gaap_to_readable_name.keys()).intersection(set(us_gaaps)):
-                # if gaap in us_gaaps:
-                units = us_gaaps[gaap]["units"]
-                index = gaap_to_readable_name[gaap]
-                for unit in units.keys():
-                    for data in units[unit]:
-                        col = get_column_name(data)
-                        df.at["StartDate", col] = data.get("start")
-                        df.at["EndDate", col] = data.get("end")
-                        df.at["FiscalPeriod", col] = data.get("fp")
-                        df.at[index, col] = data.get("val")
-
-            return df.reindex(sorted(df.columns, reverse=True), axis=1)
-
-        def update_report_db(
-            report_df: pd.DataFrame,
-            stock: Stock,
-            model: Type[IncomeStatement | BalanceSheet | CashFlow],
-            gaap_to_readable_name: dict,
-        ):
-            """
-            Update database.
-            """
-            # Report list to bulk update
-            report_list = []
-
-            # Append reports to report list
-            for col in report_df.columns:
-                # Get or create record by stock, file_date and fiscal_period
-                filed_date = col.split(" ")[0]
-                fiscal_period = report_df[col]["FiscalPeriod"]
-                try:
-                    report, created = model.objects.get_or_create(
-                        stock=stock,
-                        FileDate=filed_date,
-                        FiscalPeriod=fiscal_period,
-                    )
-                except Exception as e:
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"Error updating database, Ticker: {stock.ticker}, {model.__name__}, {e}"
-                        )
-                    )
-                    return
-
-                # Update 'StartDate' and 'EndDate'
-                report.StartDate = report_df.at["StartDate", col]
-                report.EndDate = report_df.at["EndDate", col]
-
-                # report.StartDate = report_df[col].loc["StartDate"]
-                # report.EndDate = report_df[col].loc["EndDate"]
-
-                # Update other gaap values
-                (
-                    setattr(report, name, report_df.at[name, col])
-                    for name in gaap_to_readable_name.values()
-                )
-
-                # for name in gaap_to_readable_name.values():
-                #     value = report_df[col].loc[name]
-                #     setattr(report, name, None if np.isnan(value) else value)
-
-                # Append to report_list
-                report_list.append(report)
-
-            # Get fields to update
-            fields_to_update = [
-                field.name for field in model._meta.get_fields() if field.name != "id"
-            ]
-
-            # Bulk update
-            model.objects.bulk_update(
-                report_list, fields=fields_to_update, batch_size=100
-            )
-
-        def delete_downloaded_data():
-            """
-            Remove all files from dir_companyfacts.
-            """
-            for file_name in os.listdir(dir_companyfacts):
-                file = os.path.join(dir_companyfacts, file_name)
-                os.remove(file)
-
-        def get_existing_cik_ticker_file():
-            with open(
-                os.path.join(
-                    STATICFILES_DIRS[0],
-                    "assets",
-                    "us_stocks_data",
-                    "company_tickers.json",
-                )
-            ) as f:
-                return pd.read_json(f).T
-
-        def add_important_indicators_to_income_statement(df: pd.DataFrame):
-            if df.empty:
-                return
-
-            df.loc["GrossProfit"] = df.loc["TotalRevenue"] - df.loc["CostOfSales"]
-            df.loc["TotalExpenses"] = df.loc["TotalRevenue"] - df.loc["OperatingIncome"]
-            df.loc["InterestExpenses"] = (
-                df.loc["InterestIncome"] - df.loc["InterestNet"]
-            )
-            df.loc["EBIT"] = (
-                df.loc["TotalRevenue"]
-                - df.loc["CostOfSales"]
-                - df.loc["OperatingSellingGeneralAndAdministrativeExpenses"]
-            )
-
-        def add_important_indicatros_to_balance_sheet(df: pd.DataFrame):
-            if df.empty:
-                return
-
-            df.loc["TotalNonCurrentAssets"] = (
-                df.loc["TotalAssets"] - df.loc["TotalCurrentAssets"]
-            )
-            df.loc["TotalNonCurrentLiabilities"] = (
-                df.loc["TotalLiabilitiesRedeemableNoncontrollingInterestAndEquity"]
-                - df.loc["TotalCurrentLiabilities"]
-                - df.loc["TotalEquity"]
-            )
-            df.loc["TotalLiabilities"] = (
-                df.loc["TotalCurrentLiabilities"] + df.loc["TotalNonCurrentLiabilities"]
-            )
-            df.loc["TotalCapitalization"] = (
-                df.loc["TotalShareholdersEquity"] + df.loc["LongTermDebt"]
-            )
-            df.loc["NetTangibleAssets"] = (
-                df.loc["TotalShareholdersEquity"] - df.loc["Goodwill"]
-            )
-            df.loc["NetWorkingCapital"] = (
-                df.loc["TotalCurrentAssets"] - df.loc["TotalCurrentLiabilities"]
-            )
-            df.loc["InvestedCapital"] = (
-                df.loc["TotalShareholdersEquity"]
-                + df.loc["LongTermDebt"]
-                - df_cash_flow.loc["FinancingCashFlow"]  # data from 'Cash Flow'
-            )
-            df.loc["NetDebt"] = df.loc["TotalDebt"] - df.loc["EndCashPosition"]
-
-        def add_important_indicatros_to_cash_flow(df: pd.DataFrame):
-            if df.empty:
-                return
-
-            df.loc["CapitalExpenditures"] = (
-                df.loc["PropertyAndEquipmentNet"]
-                - df.loc["PropertyAndEquipmentNet"].shift(-1)
-                - df.loc["DepreciationAndAmortization"]
-            )
-            df.loc["FreeCashFlow"] = (
-                df.loc["OperatingCashFlow"] + df.loc["CapitalExpenditures"]
-            )
-
-        # Start message
-        self.stdout.write(self.style.NOTICE("Start updating financial reports..."))
-
-        # Define zip-file path for companyfacts
-        dir_companyfacts = os.path.join(
+        """
+        Download financial reports from nasdaq's website and update database tables.
+        """
+        # Delete all files in 'companyfacts' folder
+        companyfacts_dir = os.path.join(
             STATICFILES_DIRS[0], "assets", "us_stocks_data", "companyfacts"
         )
-        zip_file_path = os.path.join(dir_companyfacts, "companyfacts.zip")
+        # self.stdout.write(
+        #     self.style.NOTICE("Deleting existings companyfacts.json files.")
+        # )
+        # delete_files(companyfacts_dir)
 
-        # # Delete all files in dir_companyfacts
-        delete_downloaded_data()
+        # # Download companyfacts.zip
+        # self.stdout.write(
+        #     self.style.NOTICE("Downloading companyfacts.zip from Nasdaq's website...")
+        # )
+        # res = download_companyfacts()
+        # if not res:
+        #     self.stdout.write(
+        #         self.style.ERROR(
+        #             f"Error downloading companyfacts.zip from Nasdaq's website. ({res.content})"
+        #         )
+        #     )
+        #     return
 
-        # Prepare header for requests module
-        header = {
-            "Host": "www.sec.gov",
-            "Connection": "close",
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "X-Requested-With": "XMLHttpRequest",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36",
-        }
+        # # Save and extract companyfacts.zip
+        # self.stdout.write(self.style.NOTICE("Saving and extracting companyfacts..."))
+        # companyfacts_zip = os.path.join(companyfacts_dir, "companyfacts.zip")
+        # res = save_and_extract_zip(res, companyfacts_zip, companyfacts_dir)
+        # if not res:
+        #     self.stdout.write(
+        #         self.style.ERROR("Error saving and extracting companyfacts.zip")
+        #     )
+        #     return
 
-        # Downlaod zip-file for companyfacts
-        try:
-            url = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
-            res = requests.get(url, stream=True, headers=header)
-            if not res.ok:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Error downloading from www.sec.gov\n{res.content}"
+        # Get cik/ticker mapper
+        cik_ticker_path = os.path.join(
+            STATICFILES_DIRS[0],
+            "assets",
+            "us_stocks_data",
+            "company_tickers.json",
+        )
+        df_cik_ticker_mapper = get_cik_ticker_mapper(
+            download=False, file_path=cik_ticker_path
+        )  # todo: 'download' should be True
+        if not isinstance(df_cik_ticker_mapper, pd.DataFrame):
+            self.stdout.write(
+                self.style.ERROR("No existing CIK-Ticker mapper file found.")
+            )
+            return
+
+        # Read companyfacts.json
+        start = time.time()
+        cik_list = df_cik_ticker_mapper["cik_str"].tolist()
+        json_files = [f for f in os.listdir(companyfacts_dir) if f.endswith(".json")]
+        for file in tqdm(json_files, desc="Reading companyfacts.json..."):
+            # Read companyfacts.json
+            with open(os.path.join(companyfacts_dir, file)) as f:
+                # Get cik
+                cik = int(file.split(".")[0].lstrip("CIK"))
+                if cik not in cik_list:
+                    # this entityName can not be searched from yfinance, probably delisted
+                    continue
+
+                # Get ticker
+                ticker = df_cik_ticker_mapper.loc[
+                    df_cik_ticker_mapper["cik_str"] == cik, "ticker"
+                ].iloc[0]
+
+                # Check stock existence
+                try:
+                    stock = Stock.objects.get(ticker=ticker)
+                except:
+                    # Save info provided by yfinance
+                    stock = save_ticker_to_stock(ticker)
+                    status = (
+                        "Created" if stock else "Failed to obtain info from yfinance"
                     )
+                    if stock is not None:
+                        self.stdout.write(
+                            self.style.NOTICE(
+                                f"{ticker} not found in database. ({status})"
+                            )
+                        )
+                    else:
+                        continue
+
+                # Catch decoding error from loading companyfacts json
+                try:
+                    companyfacts = json.load(f)
+                except UnicodeDecodeError as e:
+                    self.stdout.write(
+                        self.style.ERROR(f"Error reading companyfacts.json: {e}")
+                    )
+
+                # Update reports
+                update_reports_db(
+                    stock,
+                    BalanceSheet,
+                    GAAP_TO_READABLE_NAME_BALANCESHEET,
+                    companyfacts,
                 )
-                self.stdout.write(self.style.NOTICE("Exit updating financial reports"))
-                return
-        except Exception as e:
+                update_reports_db(
+                    stock,
+                    IncomeStatement,
+                    GAAP_TO_READABLE_NAME_INCOMESTATEMENT,
+                    companyfacts,
+                )
+
+        # Summary
+        sec = int(time.time() - start)
+        mins = sec // 60
+        self.stdout.write(self.style.NOTICE(f"Time used: {mins} mins {sec % 60} s"))
+
+    @print_status
+    def _update_candlesticks(self):
+        if not self._update_candlesticks_yfinance():
+            self._update_candlesticks_other()
+
+    @print_status
+    def _update_candlesticks_yfinance(self) -> bool:
+        start_date = datetime.date(datetime.date.today().year - 6, 1, 1)
+        ticker_list = [t.ticker for t in Stock.objects.all()]
+        batch_size = 150  # rate limit from yfinance
+        
+        for i in range(0, len(ticker_list), batch_size):
+            # Set timer for 1 minute (rate limit from yfinance)
+            request_time_start = time.time()
             self.stdout.write(
-                self.style.ERROR(f"Error downloading reports from SEC website: {e}")
+                self.style.NOTICE(
+                    f"Getting candlesticks data from yfinance: {i} to {i+batch_size}"
+                )
             )
-            self.stdout.write(self.style.NOTICE("Exit updating financial reports"))
-            return
 
-        # Save zip-file
-        with open(zip_file_path, mode="wb") as file:
-            for chunk in res.iter_content(chunk_size=10 * 1024):
-                file.write(chunk)
+            # Download data from yfinance
+            tickers_batch = ticker_list[i : i + batch_size]
+            data = yf.download(tickers=tickers_batch, start=start_date, progress=False)
+            data.replace(np.nan, 0.01, inplace=True)
 
-        # Extract companyfacts from zip-file
-        if zipfile.is_zipfile(zip_file_path):
-            with zipfile.ZipFile(zip_file_path, mode="r") as archive:
-                archive.extractall(dir_companyfacts)
-        else:
-            self.stdout.write(
-                self.style.ERROR("File 'companyfacts.zip' is not a zip file")
-            )
-            self.stdout.write(self.style.NOTICE("Exit updating financial reports"))
-            return
+            with transaction.atomic():
+                # Delete data from
+                yf_tickers = data.columns.get_level_values(1).unique().tolist()
+                CandleStick.objects.filter(stock__ticker=yf_tickers).delete()
 
-        # Download cik/ticker mapper
+                instances_to_create = []
+                for ticker in yf_tickers:
+                    # Get data for ticker
+                    data_for_ticker = data.xs(ticker, axis=1, level=1)
+                    stock = Stock.objects.get(ticker=ticker)
+
+                    for index, row in data_for_ticker.iterrows():
+                        # Gather info for Candlestick
+                        kwargs = {
+                            "stock": stock,
+                            "date": row.name.date(),  # Yf uses date as index name
+                            "open": row["Open"],
+                            "high": row["High"],
+                            "low": row["Low"],
+                            "close": row["Close"],
+                            "volume": row["Volume"],
+                            "turnover": (row["High"] - row["Low"]) / 2 * row["Volume"],
+                        }
+
+                        # Append to bulk-create later
+                        instances_to_create.append(CandleStick(**kwargs))
+                
+                # Bulk-create
+                CandleStick.objects.bulk_create(instances_to_create)
+
+            # Wait for the next minute
+            if i > len(ticker_list) - batch_size:
+                wait_time = max(60 - (time.time() - request_time_start), 0)
+                self.stdout.write(self.style.NOTICE(f"Wait for the next batch : {wait_time} seconds"))
+                time.sleep(wait_time)
+        
+        return True
+
+    @print_status
+    def _update_candlesticks_other(self) -> bool:
+        pass
+
+
+def read_stock_list() -> pd.DataFrame | str:
+    """
+    Read local 'stock_list.csv' file and return a pandas DataFrame or error string.
+    """
+    # Validate file path
+    file_name = "stock_list.csv"
+    file_path = os.path.join(STATICFILES_DIRS[0], "assets", "us_stocks_data", file_name)
+    if not os.path.isfile(file_path):
+        return f"File {file_name} not found."
+
+    df = pd.read_csv(file_path)
+    df = df[~df["Symbol"].isna()]
+    df = df[df["Symbol"].str.len() <= 5]
+    df = df[~df["Symbol"].str.contains(r"\^")]
+    df = df[~df["Symbol"].str.contains("/")]
+
+    return df.reset_index()
+
+
+def delete_files(folder: os.path):
+    """
+    Remove all files in folder.
+    """
+    [
+        os.remove(os.path.join(folder, file))
+        for file in os.listdir(folder)
+        if os.path.isfile(os.path.join(folder, file))
+    ]
+
+
+def download_companyfacts() -> requests.models.Response | str:
+    """
+    Download companyfacts from us sec website.
+    """
+    header = {
+        "Connection": "close",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0;)",
+        "X-Requested-With": "XMLHttpRequest",
+        "Accept": "application/json, text/javascript",
+    }
+    url = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
+    try:
+        res = requests.get(url, stream=True, headers=header)
+        if not res.ok:
+            return res
+
+        return res
+    except Exception as e:
+        return e
+
+
+def save_and_extract_zip(res, file_path, dir_path) -> bool:
+    """
+    Save zip file and extract all.
+    """
+    # Write
+    with open(file_path, mode="wb") as file:
+        for chunk in res.iter_content(chunk_size=10 * 1024):
+            file.write(chunk)
+
+    # Extract
+    if zipfile.is_zipfile(file_path):
+        with zipfile.ZipFile(file_path, "r") as zip_ref:
+            zip_ref.extractall(dir_path)
+        return True
+    else:
+        return False
+
+
+def get_cik_ticker_mapper(download: bool, file_path: os.path) -> pd.DataFrame | None:
+    """
+    Download cik/ticker mapper from sec.gov, if fail, get existing file from static folder.
+    """
+    if download:
+        header = {
+            "Connection": "close",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0;)",
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json, text/javascript",
+        }
         try:
             res = requests.get(
                 "https://www.sec.gov/files/company_tickers.json", headers=header
             )
-            df_cik_ticker_mapper = pd.DataFrame(res.json()).T
-        except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(
-                    f"Error downloading 'company_tickers.json', load existing file instead."
-                )
-            )
-            try:
-                df_cik_ticker_mapper = get_existing_cik_ticker_file()
-            except Exception as e:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Error loading existing 'company_tickers.json': {e}"
-                    )
-                )
-                self.stdout.write(self.style.NOTICE("Exit updating financial reports"))
+            if not res.ok:
                 return
 
-        # Create ticker list from database
-        stock_list = {s.ticker: s for s in Stock.objects.all()}
+            # Save it to local for backup
+            with open(file_path, "wb") as file:
+                for chunk in res.iter_content(chunk_size=10 * 1024):
+                    file.write(chunk)
 
-        # Filter cik/ticker mapper by ticker list
-        df_cik_ticker_mapper = df_cik_ticker_mapper[
-            df_cik_ticker_mapper["ticker"].isin(stock_list.keys())
-        ]
+        except Exception as e:
+            print(
+                f"Error downloading cik/ticker mapper: {e}, load existing file instead"
+            )
 
-        # Create dict for cik/ticker mapper
-        l_cik = df_cik_ticker_mapper["cik_str"].tolist()
-        l_ticker = df_cik_ticker_mapper["ticker"].tolist()
-        dict_cik_ticker_mapper = {cik: ticker for cik, ticker in zip(l_cik, l_ticker)}
+    try:
+        df = get_existing_cik_ticker_file(file_path)
+        if not isinstance(df, pd.DataFrame):
+            return
 
-        # Read companyfacts
-        for file in tqdm(os.listdir(dir_companyfacts), desc="Updating reports..."):
-            # Check if companyfacts in stock_list
-            file_name, file_type = file.split(".")
-            if (
-                file_type == "json"
-                and int(file_name.lstrip("CIK")) not in dict_cik_ticker_mapper.keys()
-            ):
-                continue
+        return df
 
-            with open(os.path.join(dir_companyfacts, file)) as f:
-                # Load companyfacts.json
-                try:
-                    companyfacts = json.load(f)
-                except UnicodeDecodeError as e:
-                    # self.stdout.write(
-                    #     self.style.ERROR(f"Error reading file: {file}: {e}")
-                    # )
+    except Exception as e:
+        print(f"Error loading existing cik/ticker mapper: {e}")
+        return
+
+
+def get_existing_cik_ticker_file(cik_ticker_path: os.path) -> pd.DataFrame | None:
+    """
+    Read cik/tikcer mapper file from static folder.
+    """
+    if os.path.exists(cik_ticker_path):
+        with open(cik_ticker_path) as f:
+            return pd.read_json(f).T
+
+    return
+
+
+def save_ticker_to_stock(ticker: str) -> Stock | None:
+    """
+    Get stock info from yfinance and save it to database.
+    """
+    res = yf.Search(ticker).quotes
+    if res:
+        stock = Stock.objects.create(
+            ticker=ticker,
+            name=res[0].get("shortname"),
+            sector=res[0].get("sector"),
+            industry=res[0].get("industry"),
+        )
+        stock.save()
+
+        return stock
+
+    return
+
+
+def update_reports_db(
+    stock: Stock,
+    model: IncomeStatement | BalanceSheet | CashFlow,
+    gaap_to_readable_name: dict,
+    companyfacts: dict,
+):
+    # Validate data
+    try:
+        us_gaap = companyfacts["facts"]["us-gaap"]
+    except:
+        return
+
+    # Extract necessary gaap
+    required_gaap = set(gaap_to_readable_name.keys()).intersection(set(us_gaap))
+    df = pd.DataFrame()
+    for gaap in required_gaap:
+        units = us_gaap[gaap].get("units")
+        if not units:
+            continue
+
+        for k, v in units.items():
+            for i in v:
+                filed = i.get("filed")
+                period = i.get("fp")
+                if not filed or not period:
                     continue
-
-                # Get ticker by cik from (companyfacts or filename)
-                cik = companyfacts.get("cik")
-                cik = int(cik) if cik else int(file_name.lstrip("CIK"))
-                ticker = dict_cik_ticker_mapper.get(cik)
-
-                # Extract necessary data from companyfacts
-                df_income_statement = update_data(
-                    GAAP_TO_READABLE_NAME_INCOME_STATEMENT, companyfacts
-                )
-                df_balance_sheet = update_data(
-                    GAAP_TO_READABLE_NAME_BALANCE_SHEET, companyfacts
-                )
-                df_cash_flow = update_data(
-                    GAAP_TO_READABLE_NAME_CASH_FLOW, companyfacts
+                df.loc[gaap_to_readable_name.get(gaap), filed + " " + period] = i.get(
+                    "val"
                 )
 
-                # Add other important financial indicators
-                add_important_indicators_to_income_statement(df_income_statement)
-                add_important_indicatros_to_balance_sheet(df_balance_sheet)
-                add_important_indicatros_to_cash_flow(df_cash_flow)
+    if df.empty:
+        return
 
-                # Update database
-                stock = stock_list.get(ticker)
-                update_report_db(
-                    df_income_statement,
-                    stock,
-                    IncomeStatement,
-                    GAAP_TO_READABLE_NAME_INCOME_STATEMENT,
-                )
-                update_report_db(
-                    df_balance_sheet,
-                    stock,
-                    BalanceSheet,
-                    GAAP_TO_READABLE_NAME_BALANCE_SHEET,
-                )
-                update_report_db(
-                    df_cash_flow, stock, CashFlow, GAAP_TO_READABLE_NAME_CASH_FLOW
-                )
+    # Filter out same filed date with report period 'FY' or older quarter. 'Sorted' do this thing.
+    validate_cols = []
+    required_cols = []
+    for col in sorted(df.columns):
+        date_str = col.split(" ")[0]
+        if date_str not in validate_cols:
+            validate_cols.append(date_str)
+            required_cols.append(col)
+        else:
+            required_cols[-1] = col
+    df = df[list(required_cols)]
 
-        # # Delete downloaded files
-        delete_downloaded_data()
+    # Bulk create
+    df.replace(np.nan, 0, inplace=True)
+    create_instances = []
+    for col in df.columns:
+        file_date = col.split(" ")[0]
+        # Ignore existing data
+        if not model.objects.filter(stock=stock, FileDate=file_date).exists():
+            create_instances.append(
+                model(stock=stock, FileDate=file_date, **df[col].to_dict())
+            )
 
-        # Finish message
-        self.stdout.write(self.style.NOTICE("Finish updating financial reports"))
+    model.objects.bulk_create(create_instances, batch_size=1000)

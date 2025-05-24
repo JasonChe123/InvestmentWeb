@@ -16,9 +16,6 @@ from .models import Portfolio
 from typing import Tuple
 
 
-import pdb
-
-
 @login_required
 @require_GET
 def home(request):

@@ -1,6 +1,13 @@
 from advanced_filters.admin import AdminAdvancedFiltersMixin
 from django.contrib import admin
-from .models import CandleStick, Stock, IncomeStatement, BalanceSheet, CashFlow
+from .models import (
+    CandleStick,
+    Stock,
+    IncomeStatement,
+    BalanceSheet,
+    CashFlow,
+    OtherData,
+)
 
 
 class CandleStickAdmin(AdminAdvancedFiltersMixin, admin.ModelAdmin):
@@ -10,8 +17,9 @@ class CandleStickAdmin(AdminAdvancedFiltersMixin, admin.ModelAdmin):
 
 
 # Register your models here.
-admin.site.register(CandleStick, CandleStickAdmin)
 admin.site.register(Stock)
+admin.site.register(CandleStick, CandleStickAdmin)
 admin.site.register(IncomeStatement)
 admin.site.register(BalanceSheet)
 admin.site.register(CashFlow)
+admin.site.register(OtherData)

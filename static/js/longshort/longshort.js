@@ -453,7 +453,7 @@ $(document).ready(function () {
                             <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
                         </form>
                         `)
-                        
+
                         // Add Checkboxes for Strategies List
                         data.updated_list.forEach(function (item) {
                             const div = $(`
@@ -489,5 +489,52 @@ $(document).ready(function () {
                 );
             }
         });
+    });
+
+    // Assign Strategy's Param to Add Strategy Modal
+    $('.add-strategy').on('click.modal.data-api', function (e) {
+        const addStrategyModal = $('#add-strategy-message-modal-body');
+        if (addStrategyModal.length === 0) {
+            return;
+        }
+        addStrategyModal.find('input[name="market-cap"]').val($(this).attr('market-cap'));
+        addStrategyModal.find('input[name="position-side"]').val($(this).attr('position-side'));
+        addStrategyModal.find('input[name="min-stock-price"]').val($(this).attr('min-stock-price'));
+        addStrategyModal.find('input[name="sector"]').val($(this).attr('sector'));
+        addStrategyModal.find('input[name="formula"]').val($(this).attr('formula'));
+        addStrategyModal.find('input[name="sort"]').val($(this).attr('sort'));
+    });
+
+    // Validate Chechboxes
+    const strategyCheckboxes = $('input[name="strategy-list"]');
+    strategyCheckboxes.change(function () {
+        strategyCheckboxes.each(function () { this.setCustomValidity('') });
+        if (strategyCheckboxes.is(':checked')) {
+            strategyCheckboxes.attr('required', false);
+        } else {
+            strategyCheckboxes.attr('required', true);
+        }
+    });
+
+    // Add Strategy To List
+    $('#form-add-strategy-to-list').on('submit', function (e) {
+        e.preventDefault();
+        $.ajax({
+            url: e.target.action,
+            type: e.target.method,
+            headers: {
+                'X-CSRFToken': csrfToken,
+            },
+            data: $(this).serialize(),
+            success: function (data) {
+                showDynamicMessage(data.message);
+            },
+            error: function (xhr, status, error) {
+                showDynamicMessage(data.message, 'error');
+                console.log('xhr: ', xhr);
+                console.log('status: ', status);
+                console.log('error: ', error);
+            }
+        })
     });
 });

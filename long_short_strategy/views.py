@@ -1,4 +1,5 @@
 from calendar import monthrange
+from client_area.models import StrategiesList
 from concurrent.futures.thread import ThreadPoolExecutor
 import csv
 import datetime as dt
@@ -27,15 +28,17 @@ import pandas as pd
 import re
 from typing import Tuple, List
 from .models import LongShortEquity
-from client_area.models import StrategiesList
-
 
 # todo: Change order type and ignore order amount under $100
+# - review logic of applying market_cap filter
 # - Order: Type: REL, Price 5% from previous close, allow outside RTH, Aux. Price 0.01, round qty to nearest decimal if possible
 # - Ignore any order if its amount is less $100
 # - Add 'max recovery period', 'profit factor', 'car/mdd' (compound annual return to mdd), 'sharpe ratio', 'ulcer index'
 # - remove unnecessary pip packages
 # - add combined equity curve
+# - auto compress user uploaded image from edit_profile
+# - example: Retained Earnings/total assets, all market_cap, pos_side: 10, min_stock_price: 10, min_turnover: 1M, descending
+# - standardize format: Title/ add fullstop for comment lines.
 
 MARKET_CAP = {
     "Mega (>$200B)": 200_000_000_000,
@@ -332,7 +335,7 @@ class BackTestView(View):
             min_turnover,
             l_re_balancing_dates,
         )
-        
+
         # Sort stocks by method, get top and bottom stocks by pos_hold, and split results by re-balancing dates
         result_subset = ranking(results, sorting_method, min_stock_price, min_turnover)
 
@@ -742,12 +745,14 @@ def get_result_from_method(
 
         # Apply formula
         column_name = dt.date.strftime(date, "%Y-%m-%d")
-        df_report.fillna(0, inplace=True)
+        df_report.fillna(0.00001, inplace=True)
+        df_report.replace(0, 0.00001, inplace=True)
+
         values = apply_formula(df_report, formula, column_name)
         df_result = df_result.merge(
             values[["stock__ticker", column_name]], how="left", on="stock__ticker"
         )
-    
+
     return df_result.replace(np.nan, 0).replace(np.inf, 0).replace(-np.inf, 0)
 
 
@@ -1374,16 +1379,43 @@ def add_strategies_to_list(request):
     """
     To add a LongShortEquity to StrategiesList.
     """
-    # model
-    LongShortEquity
+    # Get Strategy List
+    strategy_list = request.POST.getlist("strategy-list")
+    if not strategy_list:
+        return JsonResponse(
+            data={"message": "Please select a strategy."},
+            status=400,
+        )
 
+    # Get Strategy Params
+    params = {
+        'name': request.POST.get('name'),
+        'description': request.POST.get('description'),
+        'market_cap': json.loads(request.POST.get("market-cap").replace("'", '"')),
+        'position_side': int(request.POST.get("position-side")),
+        'min_stock_price': int(request.POST.get("min-stock-price")),
+        'sector': request.POST.get("sector"),
+        'formula': request.POST.get("formula"),
+        'sort_ascending': request.POST.get("sort").lower() == 'ascedning',
+    }
+
+    # Add Strategy
     try:
+        for title in strategy_list:
+            LongShortEquity.objects.update_or_create(
+                user=request.user,
+                strategies_list=StrategiesList.objects.get(
+                    user=request.user,
+                    title=title,
+                ),
+                **params,
+            )
 
         return JsonResponse(
-            {"message": "success", "message_type": "success", "status": "ok"},
+            data={"message": f"Strategy added to list: {", ".join(strategy_list)}"},
             status=200,
         )
     except Exception as e:
-        pass
-
-        return JsonResponse({}, status=400)
+        return JsonResponse(
+            {"message": "Add strategy errro, please try again later."}, status=400
+        )
